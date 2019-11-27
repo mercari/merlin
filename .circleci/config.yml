@@ -1,0 +1,128 @@
+version: 2
+
+defaults: &defaults
+  environment:
+    CGO_ENABLED: 0
+    GOFLAGS: -mod=vendor
+  working_directory: /opt/merlin
+
+golang: &golang
+  <<: *defaults
+  docker:
+    - image: golang:1.12
+      environment:
+        GOOGLE_APPLICATION_CREDENTIALS: /gcloud-service-key.json
+
+gcloud: &gcloud
+  <<: *defaults
+  docker:
+    - image: gcr.io/cloud-builders/gcloud
+      environment:
+        GOOGLE_APPLICATION_CREDENTIALS: /gcloud-service-key.json
+
+jobs:
+  modules:
+    <<: *golang
+    steps:
+      - checkout
+      - run:
+          name: Re-set global url with auth
+          command: git config --global url."https://${GITHUB_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+      - run:
+          name: Make lock copy
+          command: cp go.sum go.sum.fix
+      - restore_cache:
+          keys:
+            - vendor-{{ checksum "go.sum.fix" }}
+      - run:
+          name: Install dependencies
+          command: |
+            if [ ! -e vendor ]; then
+              go mod vendor
+            fi
+      - save_cache:
+          key: vendor-{{ checksum "go.sum.fix" }}
+          paths:
+            - vendor
+      - persist_to_workspace:
+          root: .
+          paths: '*'
+
+  build:
+    <<: *golang
+    steps:
+      - attach_workspace:
+          at: /opt/merlin
+      - run:
+          name: Check compilation
+          command: make build
+
+  push-image:
+    <<: *gcloud
+    steps:
+      - attach_workspace:
+          at: /opt/merlin
+      - run:
+          name: Submit build task to container builder
+          command: |
+            # Authorize
+            echo "${MERCARI_ARTIFACT_CONTAINER_BUILDER_CREDENTIALS_JSON}" > ${GOOGLE_APPLICATION_CREDENTIALS}
+            gcloud auth activate-service-account --key-file ${GOOGLE_APPLICATION_CREDENTIALS}
+            # Delete symlink files
+            find vendor -type l -delete
+
+            # Build version
+            if [ "${CIRCLE_BRANCH}" == "master" ]; then
+                export VERSION=$(date +%Y%m%d)-${CIRCLE_BUILD_NUM}
+                export SUBSTITUTIONS="_BUILD_TARGET=master,_BUILD_VERSION=$VERSION,_BUILD_BRANCH=master,_BUILD_NUMBER=$CIRCLE_BUILD_NUM"
+                export CONFIG="cloudbuild.master.yaml"
+            elif [ -n "${CIRCLE_PULL_REQUEST}" ]; then
+                export PR_NUMBER=$(basename ${CIRCLE_PULL_REQUEST})
+                export SUBSTITUTIONS="_BUILD_TARGET=pr,_BUILD_PR=$PR_NUMBER,_COMMIT_REF=$CIRCLE_SHA1,_BUILD_BRANCH=$CIRCLE_BRANCH,_BUILD_NUMBER=$CIRCLE_BUILD_NUM"
+                export CONFIG="cloudbuild.pr.yaml"
+            else
+                echo "Change was not pushed to a branch with pull request, will not build image for it"
+                exit 1
+            fi
+
+            # Build the image
+            gcloud builds submit . \
+              --project=mercari-artifacts \
+              --config="$CONFIG" \
+              --gcs-log-dir="gs://mercari-artifacts_cloudbuild_logs/logs" \
+              --substitutions="$SUBSTITUTIONS"
+
+workflows:
+  version: 2
+  build-and-test:
+    jobs:
+      - modules:
+          context: org-global
+      - build:
+          requires:
+            - modules
+      - lint:
+          context: org-global
+          requires:
+            - modules
+          filters:
+            branches:
+              ignore: master
+      - vet:
+          context: org-global
+          requires:
+            - modules
+          filters:
+            branches:
+              ignore: master
+      - test:
+          context: org-global
+          requires:
+            - modules
+      - push-image:
+          context: org-global
+          requires:
+            - build
+            - lint
+            - vet
+            - test
