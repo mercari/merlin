@@ -75,20 +75,15 @@ jobs:
             if [ "${CIRCLE_BRANCH}" == "master" ]; then
                 export VERSION=$(date +%Y%m%d)-${CIRCLE_BUILD_NUM}
                 export SUBSTITUTIONS="_BUILD_TARGET=master,_BUILD_VERSION=$VERSION,_BUILD_BRANCH=master,_BUILD_NUMBER=$CIRCLE_BUILD_NUM"
-                export CONFIG="cloudbuild.master.yaml"
-            elif [ -n "${CIRCLE_PULL_REQUEST}" ]; then
-                export PR_NUMBER=$(basename ${CIRCLE_PULL_REQUEST})
-                export SUBSTITUTIONS="_BUILD_TARGET=pr,_BUILD_PR=$PR_NUMBER,_COMMIT_REF=$CIRCLE_SHA1,_BUILD_BRANCH=$CIRCLE_BRANCH,_BUILD_NUMBER=$CIRCLE_BUILD_NUM"
-                export CONFIG="cloudbuild.pr.yaml"
             else
-                echo "Change was not pushed to a branch with pull request, will not build image for it"
+                echo "Change was not pushed to master branch, will not build image for it"
                 exit 1
             fi
 
             # Build the image
             gcloud builds submit . \
-              --project=mercari-artifacts \
-              --config="$CONFIG" \
+              --project=mercari-us-double \
+              --config="cloudbuild.yaml" \
               --gcs-log-dir="gs://mercari-artifacts_cloudbuild_logs/logs" \
               --substitutions="$SUBSTITUTIONS"
 
@@ -101,28 +96,7 @@ workflows:
       - build:
           requires:
             - modules
-      - lint:
-          context: org-global
-          requires:
-            - modules
-          filters:
-            branches:
-              ignore: master
-      - vet:
-          context: org-global
-          requires:
-            - modules
-          filters:
-            branches:
-              ignore: master
-      - test:
-          context: org-global
-          requires:
-            - modules
       - push-image:
           context: org-global
           requires:
             - build
-            - lint
-            - vet
-            - test

@@ -6,8 +6,6 @@ steps:
       - gcr.io/mercari-double-us/merlin:$_BUILD_TARGET-$_BUILD_VERSION
       - --build-arg
       - BUILD_NUMBER=$_BUILD_NUMBER
-      - --build-arg
-      - BUILD_BRANCH=$_BUILD_BRANCH
       - .
 
 images:
