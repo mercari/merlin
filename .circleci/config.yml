@@ -12,7 +12,7 @@ golang: &golang
     - image: golang:1.12
       environment:
         GOOGLE_APPLICATION_CREDENTIALS: /gcloud-service-key.json
-g
+
 gcloud: &gcloud
   <<: *defaults
   docker:
