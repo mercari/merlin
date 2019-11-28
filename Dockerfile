@@ -11,7 +11,12 @@ RUN apk add --no-cache git && \
 	mkdir -p "${OUTDIR}" && \
 	go mod tidy -v && \
 	go mod vendor -v && \
-	GOBIN=$OUTDIR CGO_ENABLED=0 go install -a -v -mod=vendor -tags='osusergo netgo static static_build' -ldflags="-d -s -w '-extldflags=-static'" -installsuffix='netgo' github.com/kouzoh/merlin
+	GOBIN=$OUTDIR CGO_ENABLED=0 \
+        go install -a -v -mod=vendor \
+        -tags='osusergo netgo static static_build' \
+        -ldflags="-d -s -w '-extldflags=-static'" \
+        -installsuffix='netgo' \
+        github.com/kouzoh/merlin
 
 # target: nonroot
 FROM gcr.io/distroless/static:nonroot AS nonroot

@@ -12,7 +12,7 @@ golang: &golang
     - image: golang:1.12
       environment:
         GOOGLE_APPLICATION_CREDENTIALS: /gcloud-service-key.json
-
+g
 gcloud: &gcloud
   <<: *defaults
   docker:
@@ -74,7 +74,7 @@ jobs:
             # Build version
             if [ "${CIRCLE_BRANCH}" == "master" ]; then
                 export VERSION=$(date +%Y%m%d)-${CIRCLE_BUILD_NUM}
-                export SUBSTITUTIONS="_BUILD_TARGET=master,_BUILD_VERSION=$VERSION,_BUILD_BRANCH=master,_BUILD_NUMBER=$CIRCLE_BUILD_NUM"
+                export SUBSTITUTIONS="_BUILD_TARGET=master,_BUILD_VERSION=$VERSION,_BUILD_NUMBER=$CIRCLE_BUILD_NUM"
             else
                 echo "Change was not pushed to master branch, will not build image for it"
                 exit 1
