@@ -80,6 +80,7 @@ jobs:
                 exit 1
             fi
 
+            echo "submittigng cloud build with SUBSTITUTIONS=$SUBSTITUTIONS"
             # Build the image
             gcloud builds submit . \
               --project=mercari-us-double \
