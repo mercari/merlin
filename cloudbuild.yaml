@@ -3,10 +3,10 @@ steps:
     args:
       - build
       - -t
-      - gcr.io/mercari-double-us/merlin:$_BUILD_TARGET-$_BUILD_VERSION
+      - gcr.io/mercari-us-double/merlin:$_BUILD_TARGET-$_BUILD_VERSION
       - --build-arg
       - BUILD_NUMBER=$_BUILD_NUMBER
       - .
 
 images:
-  - gcr.io/mercari-double-us/merlin:$_BUILD_TARGET-$_BUILD_VERSION
+  - gcr.io/mercari-us-double/merlin:$_BUILD_TARGET-$_BUILD_VERSION
