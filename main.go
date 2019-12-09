@@ -24,15 +24,17 @@ const (
 )
 
 var kubeConfigPath string
-var interval string
 
 func init() {
 	flag.StringVar(&kubeConfigPath, "kubeConfig", "", "Path to a kube config. Only required if out-of-cluster.")
-	flag.StringVar(&interval, "interval", "10", "Interval to check the system resources, in seconds")
 }
 
 func main() {
 	flag.Parse()
+	interval := os.Getenv("INTERVAL")
+	if interval == "" {
+		interval = "30"
+	}
 	checkInterval, err := strconv.Atoi(interval)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[ERROR] Failed to parse interval, is it int? error: %s\n", err)

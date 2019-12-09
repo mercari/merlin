@@ -7,8 +7,21 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"strings"
 	"time"
 )
+
+const (
+	IstioInjectionLabel = "istio-injection"
+)
+
+var SkipNamespaces = []string{
+	"cert-manager",
+	"certificate-expiry-monitor-controller",
+	"istio-system",
+	"kube-system",
+	"prometheus",
+}
 
 type Controller struct {
 	Clientset *kubernetes.Clientset
@@ -16,13 +29,15 @@ type Controller struct {
 	Logger    *zap.Logger
 }
 
-type PodInfo struct {
+type ServiceInfo struct {
 	Name       string
+	NameSpace  string
 	Deployment string
 	ReplicaSet string
 	Service    string
 	HPA        string
 	PDB        string
+	NumPods    int32
 }
 
 func (c *Controller) GetBelongedDeployment(pods, deployment *v1beta1.Deployment) (interface{}, error) {
@@ -37,8 +52,19 @@ func (c *Controller) RunOnce(ctx context.Context) error {
 	}
 
 	for _, ns := range namespaces.Items {
-		c.Logger.Info("checking namespace", zap.String("ns", ns.Name))
-		var podInfos []PodInfo
+		if IsSkipCheckingNamespace(ns.Name) {
+			c.Logger.Debug("Skip checking namespace as it's in the skip list.",
+				zap.String("ns", ns.Name))
+			continue
+		}
+		ServiceInfos := map[string]*ServiceInfo{}
+		c.Logger.Info("check namespace", zap.String("ns", ns.Name))
+
+		// check if ns has istio-inject
+		if ns.ObjectMeta.Labels[IstioInjectionLabel] == "" {
+			c.Logger.Warn("Namespaces has no istio injection and it's not explicitly disabled",
+				zap.String("ns", ns.Name))
+		}
 
 		// pods
 		pods, err := c.Clientset.CoreV1().Pods(ns.Name).List(metav1.ListOptions{})
@@ -70,16 +96,15 @@ func (c *Controller) RunOnce(ctx context.Context) error {
 			c.Logger.Error("failed to list PDBs", zap.Error(err), zap.String("ns", ns.Name))
 		}
 
-		//// HPAs
-		//hpas, err := c.Clientset.AutoscalingV1().HorizontalPodAutoscalers(ns.Name).List(metav1.ListOptions{})
-		//if err != nil {
-		//	c.Logger.Error("failed to list HPAs", zap.Error(err), zap.String("ns", ns.Name))
-		//}
+		// HPAs
+		hpas, err := c.Clientset.AutoscalingV1().HorizontalPodAutoscalers(ns.Name).List(metav1.ListOptions{})
+		if err != nil {
+			c.Logger.Error("failed to list HPAs", zap.Error(err), zap.String("ns", ns.Name))
+		}
 
 		for _, p := range pods.Items {
-			podInfo := PodInfo{Name: p.Name}
 
-			// checking if pod has too many restarts and not running
+			// check if pod has too many restarts and not running
 			for _, containerStatus := range p.Status.ContainerStatuses {
 				if containerStatus.RestartCount > 10 && p.Status.Phase != v1.PodRunning {
 					c.Logger.Warn("Pod has >10 restarts and it's not running",
@@ -88,7 +113,16 @@ func (c *Controller) RunOnce(ctx context.Context) error {
 				}
 			}
 
-			// checking what deployment the pod belongs to
+			podNameSlice := strings.Split(p.Name, "-")
+			podBaseName := strings.Join(podNameSlice[:len(podNameSlice)-1], "-")
+			if s, ok := ServiceInfos[podBaseName]; ok {
+				s.NumPods += 1
+				// same type of pod already exists in the map
+				continue
+			}
+			ServiceInfo := ServiceInfo{Name: podBaseName, NumPods: 1}
+
+			// check what deployment the service pod belongs to
 			for _, d := range deployments.Items {
 				matches := 0
 				for k, v := range d.Spec.Selector.MatchLabels {
@@ -97,11 +131,11 @@ func (c *Controller) RunOnce(ctx context.Context) error {
 					}
 				}
 				if matches == len(d.Spec.Selector.MatchLabels) {
-					podInfo.Deployment = d.Name
+					ServiceInfo.Deployment = d.Name
 				}
 			}
 
-			// checking what replicaset the pod belongs to
+			// check what replicaset the pod belongs to
 			for _, r := range replicaSets.Items {
 				matches := 0
 				for k, v := range r.Spec.Selector.MatchLabels {
@@ -110,17 +144,17 @@ func (c *Controller) RunOnce(ctx context.Context) error {
 					}
 				}
 				if matches == len(r.Spec.Selector.MatchLabels) {
-					podInfo.ReplicaSet = r.Name
+					ServiceInfo.ReplicaSet = r.Name
 				}
 			}
 
-			if podInfo.Deployment == "" && podInfo.ReplicaSet == "" {
+			if ServiceInfo.Deployment == "" && ServiceInfo.ReplicaSet == "" {
 				c.Logger.Warn("Pod is not managed by a deployment or replicaset",
 					zap.String("ns", ns.Name),
 					zap.String("pod", p.Name))
 			}
 
-			// checking what service the pod belongs to
+			// check what service the pod belongs to
 			for _, s := range services.Items {
 				matches := 0
 				for k, v := range s.Spec.Selector {
@@ -129,11 +163,11 @@ func (c *Controller) RunOnce(ctx context.Context) error {
 					}
 				}
 				if matches == len(s.Spec.Selector) {
-					podInfo.Service = s.Name
+					ServiceInfo.Service = s.Name
 				}
 			}
 
-			if podInfo.Service == "" {
+			if ServiceInfo.Service == "" {
 				isJob := false
 				for _, o := range p.OwnerReferences {
 					if o.Kind == "Job" {
@@ -147,7 +181,7 @@ func (c *Controller) RunOnce(ctx context.Context) error {
 				}
 			}
 
-			// checking if what pdb the pod belongs to
+			// check what pdb the pod belongs to
 			for _, pdb := range pdbs.Items {
 				matches := 0
 				for k, v := range pdb.Spec.Selector.MatchLabels {
@@ -156,41 +190,59 @@ func (c *Controller) RunOnce(ctx context.Context) error {
 					}
 				}
 				if matches == len(pdb.Spec.Selector.MatchLabels) {
-					podInfo.PDB = pdb.Name
+					ServiceInfo.PDB = pdb.Name
 				}
 			}
-			if podInfo.PDB == "" {
+			if ServiceInfo.PDB == "" {
 				c.Logger.Warn("Pod is not managed by PDB",
 					zap.String("ns", ns.Name),
 					zap.String("pod", p.Name))
 			}
 
-			podInfos = append(podInfos, podInfo)
+			// check if the pod's replicaset or deployment has hpa
+			for _, hpa := range hpas.Items {
+				if hpa.Spec.ScaleTargetRef.Kind == "Deployment" {
+					if ServiceInfo.Deployment == hpa.Spec.ScaleTargetRef.Name {
+						ServiceInfo.HPA = hpa.Name
+					}
+				} else if hpa.Spec.ScaleTargetRef.Kind == "ReplicaSet" {
+					if ServiceInfo.ReplicaSet == hpa.Spec.ScaleTargetRef.Name {
+						ServiceInfo.HPA = hpa.Name
+					}
+				}
+			}
+			if ServiceInfo.HPA == "" {
+				c.Logger.Warn("Pod is not managed by HPA",
+					zap.String("ns", ns.Name),
+					zap.String("pod", p.Name))
+			}
+
+			ServiceInfos[podBaseName] = &ServiceInfo
 		}
 
 		// Check orphaned resources, like service, hpa, pdb, etc
 		//for _, d := range deployments.Items {
-		//	c.Logger.Debug("checking deployment", zap.String("ns", ns.Name), zap.String("deploy", d.Name))
+		//	c.Logger.Debug("check deployment", zap.String("ns", ns.Name), zap.String("deploy", d.Name))
 		//}
 		//
 		//
 		//for _, r := range replicaSets.Items {
-		//	c.Logger.Debug("checking replicaset", zap.String("ns", ns.Name), zap.String("replicaset", r.Name))
+		//	c.Logger.Debug("check replicaset", zap.String("ns", ns.Name), zap.String("replicaset", r.Name))
 		//}
 		//
 		//
 		//for _, s := range services.Items {
-		//	c.Logger.Debug("checking service", zap.String("ns", ns.Name), zap.String("service", s.Name))
+		//	c.Logger.Debug("check service", zap.String("ns", ns.Name), zap.String("service", s.Name))
 		//}
 		//
 		//
 		//for _, p := range pdbs.Items {
-		//	c.Logger.Debug("checking PDB", zap.String("ns", ns.Name), zap.String("pdb", p.Name))
+		//	c.Logger.Debug("check PDB", zap.String("ns", ns.Name), zap.String("pdb", p.Name))
 		//}
 		//
 		//
 		//for _, h := range hpas.Items {
-		//	c.Logger.Debug("checking PDB", zap.String("ns", ns.Name), zap.String("hpa", h.Name))
+		//	c.Logger.Debug("check PDB", zap.String("ns", ns.Name), zap.String("hpa", h.Name))
 		//}
 		//
 
@@ -213,4 +265,13 @@ func (c *Controller) Run(ctx context.Context) {
 			return
 		}
 	}
+}
+
+func IsSkipCheckingNamespace(namespace string) bool {
+	for _, skipNamespace := range SkipNamespaces {
+		if namespace == skipNamespace {
+			return true
+		}
+	}
+	return false
 }
