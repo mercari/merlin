@@ -24,9 +24,10 @@ var SkipNamespaces = []string{
 }
 
 type Controller struct {
-	Clientset *kubernetes.Clientset
-	Interval  time.Duration
-	Logger    *zap.Logger
+	Clientset   *kubernetes.Clientset
+	Interval    time.Duration
+	Logger      *zap.Logger
+	ProdCluster bool
 }
 
 type ServiceInfo struct {
@@ -218,6 +219,10 @@ func (c *Controller) RunOnce(ctx context.Context) error {
 			}
 
 			ServiceInfos[podBaseName] = &ServiceInfo
+		}
+
+		if c.ProdCluster {
+
 		}
 
 		// Check orphaned resources, like service, hpa, pdb, etc

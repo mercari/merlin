@@ -1,0 +1,7 @@
+domain: merlin.mercari.com
+repo: github.com/kouzoh/merlin
+resources:
+- group: watcher
+  kind: Notifier
+  version: v1
+version: "2"

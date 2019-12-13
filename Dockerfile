@@ -1,25 +1,27 @@
-FROM golang:1.12-alpine AS merlin-build
+# Build the manager binary
+FROM golang:1.13 as builder
 
-ENV OUTDIR=/out \
-    GO111MODULE=on
+WORKDIR /workspace
+# Copy the Go Modules manifests
+COPY go.mod go.mod
+COPY go.sum go.sum
+# cache deps before building and copying source so that we don't need to re-download as much
+# and so that source changes don't invalidate our downloaded layer
+RUN go mod download
 
-COPY . /go/src/github.com/kouzoh/merlin
-WORKDIR /go/src/github.com/kouzoh/merlin
+# Copy the go source
+COPY main.go main.go
+COPY api/ api/
+COPY controllers/ controllers/
 
-RUN apk add --no-cache git && \
-    set -eux && \
-	mkdir -p "${OUTDIR}" && \
-	go mod tidy -v && \
-	go mod vendor -v && \
-	GOBIN=$OUTDIR CGO_ENABLED=0 \
-        go install -a -v -mod=vendor \
-        -tags='osusergo netgo static static_build' \
-        -ldflags="-d -s -w '-extldflags=-static'" \
-        -installsuffix='netgo' \
-        github.com/kouzoh/merlin
+# Build
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o manager main.go
 
-# target: nonroot
-FROM gcr.io/distroless/static:nonroot AS nonroot
-COPY --from=merlin-build /out/ /
+# Use distroless as minimal base image to package the manager binary
+# Refer to https://github.com/GoogleContainerTools/distroless for more details
+FROM gcr.io/distroless/static:nonroot
+WORKDIR /
+COPY --from=builder /workspace/manager .
 USER nonroot:nonroot
-CMD ["/merlin"]
+
+ENTRYPOINT ["/manager"]
