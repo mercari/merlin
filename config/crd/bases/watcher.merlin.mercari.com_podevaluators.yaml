@@ -35,8 +35,8 @@ spec:
           description: PodEvaluatorSpec defines the desired state of PodEvaluator
           properties:
             crashes:
-              description: Crashes is the number of crashes limit before we send out
-                alert
+              description: Restarts is the number of restarts limit before we send
+                out a notification
               format: int32
               type: integer
           type: object

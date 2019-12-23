@@ -27,8 +27,8 @@ type PodEvaluatorSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Crashes is the number of crashes limit before we send out alert
-	Crashes int32 `json:"crashes,omitempty"`
+	// Restarts is the number of restarts limit before we send out a notification
+	Restarts int32 `json:"crashes,omitempty"`
 }
 
 // PodEvaluatorStatus defines the observed state of PodEvaluator

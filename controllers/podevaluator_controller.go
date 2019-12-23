@@ -46,11 +46,14 @@ type PodEvaluatorReconciler struct {
 func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	l := r.Log.WithValues("namespace", req.Namespace, "resource name", req.Name)
+	notifier := watcherv1.Notifiers{}
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: "notifiers-sample"}, &notifier); err != nil {
+		l.Error(err, "failed to get notifier")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
 	evaluator := watcherv1.PodEvaluator{}
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: "podevaluator-sample"}, &evaluator); err != nil {
 		l.Error(err, "failed to get evaluator")
-		// Ignore NotFound errors as they will be retried automatically if the
-		// resource is created in future.
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	pods := corev1.PodList{}
@@ -62,11 +65,13 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		// check if pod has too many restarts and not running
 		for i, containerStatus := range p.Status.ContainerStatuses {
 			l.Info("Checking pod",
+				"notifier", notifier.Name,
+				"notifier-slack url", notifier.Spec.Slack.URL,
 				"name", p.Name,
 				"container", p.Spec.Containers[i].Name,
 				"container ready", containerStatus.Ready)
-			if containerStatus.RestartCount > evaluator.Spec.Crashes && p.Status.Phase != corev1.PodRunning {
-				l.Info("Pod has >10 restarts and it's not running", "namespace", req.Namespace, "pod", req.Name)
+			if containerStatus.RestartCount > evaluator.Spec.Restarts && p.Status.Phase != corev1.PodRunning {
+				l.Info("Pod has too many restarts and it's not running", "namespace", req.Namespace, "pod", req.Name, "restart limit", evaluator.Spec.Restarts)
 			}
 		}
 	}
