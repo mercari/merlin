@@ -73,10 +73,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&watcherv1.Notifier{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "Notifier")
-		os.Exit(1)
-	}
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")
