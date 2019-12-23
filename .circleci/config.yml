@@ -55,7 +55,7 @@ jobs:
           at: /opt/merlin
       - run:
           name: Check compilation
-          command: make build
+          command: make docker-build
 
   push-image:
     <<: *gcloud
