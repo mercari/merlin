@@ -101,7 +101,7 @@ jobs:
             gcloud builds submit . \
               --project=mercari-us-double \
               --config="cloudbuild.yaml" \
-              --gcs-log-dir="gs://mercari-us-double-cloudbuild-logs/logs" \
+              --gcs-log-dir="gs://mercari-us-double_cloudbuild_logs/logs" \
               --substitutions="_BUILD_TARGET=$TARGET,_BUILD_VERSION=$VERSION,_BUILD_NUMBER=$CIRCLE_BUILD_NUM"
 
 workflows:
