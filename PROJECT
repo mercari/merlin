@@ -2,6 +2,6 @@ domain: merlin.mercari.com
 repo: github.com/kouzoh/merlin
 resources:
 - group: watcher
-  kind: Notifier
+  kind: PodEvaluator
   version: v1
 version: "2"

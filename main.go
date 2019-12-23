@@ -64,12 +64,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.NotifierReconciler{
+	if err = (&controllers.PodEvaluatorReconciler{
 		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("Notifier"),
+		Log:    ctrl.Log.WithName("controllers").WithName("PodEvaluator"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Notifier")
+		setupLog.Error(err, "unable to create controller", "controller", "PodEvaluator")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
