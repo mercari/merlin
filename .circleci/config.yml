@@ -47,7 +47,7 @@ jobs:
           root: .
           paths: '*'
 
-  build:
+  test:
     <<: *golang
     steps:
       - attach_workspace:
@@ -67,8 +67,8 @@ jobs:
             mv /tmp/kubebuilder_2.2.0_${os}_${arch} /usr/local/kubebuilder
             export PATH=$PATH:/usr/local/kubebuilder/bin
       - run:
-          name: Check compilation
-          command: make docker-build
+          name: Run tests
+          command: make test
 
   push-image:
     <<: *gcloud
@@ -107,10 +107,10 @@ workflows:
     jobs:
       - modules:
           context: org-global
-      - build:
+      - test:
           requires:
             - modules
       - push-image:
           context: org-global
           requires:
-            - build
+            - test
