@@ -87,10 +87,13 @@ jobs:
             # Build version
             if [ "${CIRCLE_BRANCH}" == "master" ]; then
                 export VERSION=$(date +%Y%m%d)-${CIRCLE_BUILD_NUM}
-                export SUBSTITUTIONS="_BUILD_TARGET=master,_BUILD_VERSION=$VERSION,_BUILD_NUMBER=$CIRCLE_BUILD_NUM"
+                export TARGET=master
+            elif [ -n "${CIRCLE_PULL_REQUEST}" ]; then
+                export VERSION=$(basename ${CIRCLE_PULL_REQUEST})
+                export TARGET=pr
             else
-                echo "Change was not pushed to master branch, will not build image for it"
-                exit 1
+                echo "Change was not pushed to master branch nor pull request, will not build image for it"
+                exit 0
             fi
 
             echo "submittigng cloud build with SUBSTITUTIONS=$SUBSTITUTIONS"
@@ -99,7 +102,7 @@ jobs:
               --project=mercari-us-double \
               --config="cloudbuild.yaml" \
               --gcs-log-dir="gs://mercari-us-double-cloudbuild-logs/logs" \
-              --substitutions="$SUBSTITUTIONS"
+              --substitutions="_BUILD_TARGET=$TARGET,_BUILD_VERSION=$VERSION,_BUILD_NUMBER=$CIRCLE_BUILD_NUM"
 
 workflows:
   version: 2
