@@ -3,7 +3,6 @@ version: 2
 defaults: &defaults
   environment:
     CGO_ENABLED: 0
-    GOFLAGS: -mod=vendor
   working_directory: /opt/merlin
 
 golang: &golang
