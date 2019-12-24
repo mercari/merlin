@@ -71,7 +71,7 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 	pods := corev1.PodList{}
 	if err := r.List(ctx, &pods, &client.ListOptions{Namespace: req.Namespace}); err != nil {
-		l.Error(err, "unable to fetch Deployment")
+		l.Error(err, "unable to fetch Pods")
 		return ctrl.Result{}, ignoreNotFound(err)
 	}
 	ServiceInfos := map[string]*ServiceInfo{}
