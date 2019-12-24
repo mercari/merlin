@@ -20,7 +20,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
+const (
+	NotifiersMetadataName = "notifiers"
+)
+
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // NotifiersSpec defines the desired state of Notifiers
@@ -30,6 +33,7 @@ type NotifiersSpec struct {
 
 	// Slack is the notifier for slack
 	Slack Slack `json:"slack,omitempty"`
+	// TODO: add a wrapper to validate and send to all notifiers
 }
 
 // NotifiersStatus defines the observed state of Notifiers

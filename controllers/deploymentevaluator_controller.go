@@ -1,0 +1,81 @@
+/*
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package controllers
+
+import (
+	"context"
+	"github.com/go-logr/logr"
+	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	watcherv1 "github.com/kouzoh/merlin/api/v1"
+)
+
+// DeploymentEvaluatorReconciler reconciles a DeploymentEvaluator object
+type DeploymentEvaluatorReconciler struct {
+	client.Client
+	Log    logr.Logger
+	Scheme *runtime.Scheme
+}
+
+// +kubebuilder:rbac:groups=watcher.merlin.mercari.com,resources=deploymentevaluators,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=watcher.merlin.mercari.com,resources=deploymentevaluators/status,verbs=get;update;patch
+
+func (r *DeploymentEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+	ctx := context.Background()
+	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Namespace, "deployment name", req.Name)
+
+	notifiers := watcherv1.Notifiers{}
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.NotifiersMetadataName}, &notifiers); err != nil {
+		l.Error(err, "failed to get notifier")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	evaluator := watcherv1.DeploymentEvaluator{}
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.DeploymentEvaluatorMetadataName}, &evaluator); err != nil {
+		l.Error(err, "failed to get evaluator")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	// TODO: adding checks for deployments
+
+	return ctrl.Result{}, nil
+}
+
+func (r *DeploymentEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	l := r.Log.WithName("Setup")
+	if err := mgr.GetFieldIndexer().IndexField(&appsv1.Deployment{}, ".metadata.name", func(rawObj runtime.Object) []string {
+		deployment := rawObj.(*appsv1.Deployment)
+		l.Info("index field", "deployment", deployment.Name)
+		return []string{deployment.Name}
+	}); err != nil {
+		return err
+	}
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&watcherv1.DeploymentEvaluator{}).
+		For(&appsv1.Deployment{}).
+		WithEventFilter(predicate.Funcs{
+			// While we do not care what the event contains, we should not handle Delete events or Unknown / Generic events
+			CreateFunc:  func(e event.CreateEvent) bool { return true },
+			DeleteFunc:  func(e event.DeleteEvent) bool { return false },
+			UpdateFunc:  func(e event.UpdateEvent) bool { return true },
+			GenericFunc: func(e event.GenericEvent) bool { return true },
+		}).
+		Complete(r)
+}

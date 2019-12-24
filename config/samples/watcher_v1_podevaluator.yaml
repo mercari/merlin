@@ -1,7 +1,6 @@
 apiVersion: watcher.merlin.mercari.com/v1
 kind: PodEvaluator
 metadata:
-  name: podevaluator-sample
+  name: pod-evaluator
 spec:
-  # Add fields here
-  Crashes: 10
+  restarts: 10

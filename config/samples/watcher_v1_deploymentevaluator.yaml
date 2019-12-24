@@ -1,0 +1,7 @@
+apiVersion: watcher.merlin.mercari.com/v1
+kind: DeploymentEvaluator
+metadata:
+  name: deployment-evaluator
+spec:
+  # Add fields here
+  foo: bar

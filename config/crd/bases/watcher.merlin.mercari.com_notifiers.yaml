@@ -37,13 +37,13 @@ spec:
             slack:
               description: Slack is the notifier for slack
               properties:
-                token:
+                channel:
                   type: string
-                url:
+                webhook_url:
                   type: string
               required:
-              - token
-              - url
+              - channel
+              - webhook_url
               type: object
           type: object
         status:

@@ -11,42 +11,53 @@ rules:
   resources:
   - events
   verbs:
-  - create
   - get
-  - patch
+  - list
+  - watch
 - apiGroups:
   - apps
   resources:
   - deployments
   verbs:
-  - create
-  - delete
   - get
   - list
-  - update
   - watch
 - apiGroups:
   - corev1
   resources:
   - pods
   verbs:
-  - create
-  - delete
   - get
   - list
-  - update
   - watch
 - apiGroups:
   - corev1
   resources:
   - services
   verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - watcher.merlin.mercari.com
+  resources:
+  - deploymentevaluators
+  verbs:
   - create
   - delete
   - get
   - list
+  - patch
   - update
   - watch
+- apiGroups:
+  - watcher.merlin.mercari.com
+  resources:
+  - deploymentevaluators/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - watcher.merlin.mercari.com
   resources:

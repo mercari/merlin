@@ -1,9 +1,9 @@
 apiVersion: watcher.merlin.mercari.com/v1
 kind: Notifiers
 metadata:
-  name: notifiers-sample
+  name: notifiers
 spec:
   # Add fields here
   slack:
-    url: "mercari"
-    token: "token"
+    channel: "your_channel"
+    webhook_url: "your_webhook_url"
