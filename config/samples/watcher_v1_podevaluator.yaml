@@ -3,4 +3,11 @@ kind: PodEvaluator
 metadata:
   name: pod-evaluator
 spec:
+  ignoreNamespaces:
+    - kube-system
+    - isto-system
+    - test
+    - spinnaker
+    - cert-manager
+    - prometheus
   restarts: 10
