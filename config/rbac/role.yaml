@@ -15,9 +15,25 @@ rules:
   - list
   - watch
 - apiGroups:
-  - apps
+  - appsv1
   resources:
   - deployments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - appsv1
+  resources:
+  - replicasets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - autoscalingv1
+  resources:
+  - hpa
   verbs:
   - get
   - list
@@ -34,6 +50,14 @@ rules:
   - corev1
   resources:
   - services
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - policyv1beta1
+  resources:
+  - pdb
   verbs:
   - get
   - list

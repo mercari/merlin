@@ -4,4 +4,4 @@ metadata:
   name: deployment-evaluator
 spec:
   # Add fields here
-  foo: bar
+  canary: {}

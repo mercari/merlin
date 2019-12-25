@@ -32,6 +32,8 @@ type PodEvaluatorSpec struct {
 
 	// Restarts is the number of restarts limit before we send out a notification
 	Restarts int32 `json:"crashes,omitempty"`
+	// IgnoreNamespaces is the list of namespaces (string) to ignore
+	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
 }
 
 // PodEvaluatorStatus defines the observed state of PodEvaluator

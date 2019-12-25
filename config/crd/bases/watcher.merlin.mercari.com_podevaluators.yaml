@@ -39,6 +39,12 @@ spec:
                 out a notification
               format: int32
               type: integer
+            ignoreNamespaces:
+              description: IgnoreNamespaces is the list of namespaces (string) to
+                ignore
+              items:
+                type: string
+              type: array
           type: object
         status:
           description: PodEvaluatorStatus defines the observed state of PodEvaluator

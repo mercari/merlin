@@ -35,10 +35,9 @@ spec:
         spec:
           description: DeploymentEvaluatorSpec defines the desired state of DeploymentEvaluator
           properties:
-            foo:
-              description: Foo is an example field of DeploymentEvaluator. Edit DeploymentEvaluator_types.go
-                to remove/update
-              type: string
+            canary:
+              description: Canary is used to check if there's canary deployment define
+              type: object
           type: object
         status:
           description: DeploymentEvaluatorStatus defines the observed state of DeploymentEvaluator
