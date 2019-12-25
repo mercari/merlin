@@ -23,9 +23,6 @@ const (
 	HPAEvaluatorMetadataName = "hpa-evaluator"
 )
 
-// +kubebuilder:object:root=true
-// +kubebuilder:resource:scope=Cluster
-
 type HPAEvaluatorSpec struct {
 }
 

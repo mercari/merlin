@@ -18,3 +18,5 @@ vendor
 *.out
 
 coverage.txt
+
+bin/*
