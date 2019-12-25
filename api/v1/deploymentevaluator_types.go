@@ -26,6 +26,7 @@ const (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 type Canary struct {
+	Enabled bool `json:"enabled,omitempty"`
 }
 
 // DeploymentEvaluatorSpec defines the desired state of DeploymentEvaluator
@@ -35,6 +36,8 @@ type DeploymentEvaluatorSpec struct {
 
 	// Canary is used to check if there's canary deployment define
 	Canary Canary `json:"canary,omitempty"`
+	// IgnoreNamespaces is the list of namespaces (string) to ignore
+	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
 }
 
 // DeploymentEvaluatorStatus defines the observed state of DeploymentEvaluator

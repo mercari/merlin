@@ -41,7 +41,8 @@ type PodEvaluatorReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-type ServiceInfo struct {
+// TODO: better naming..?
+type PodInfo struct {
 	Name       string
 	NameSpace  string
 	Deployment string
@@ -49,8 +50,10 @@ type ServiceInfo struct {
 	Service    string
 	HPA        string
 	PDB        string
-	NumPods    int32
 }
+
+// TODO: better way of handling this - it's used to coordinate b/w reconciliation processes.
+var podInfos = map[string]*PodInfo{}
 
 // +kubebuilder:rbac:groups=watcher.merlin.mercari.com,resources=podevaluators,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=watcher.merlin.mercari.com,resources=podevaluators/status,verbs=get;update;patch
@@ -88,7 +91,7 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		l.Error(err, "unable to fetch Pods")
 		return ctrl.Result{}, ignoreNotFound(err)
 	}
-	ServiceInfos := map[string]*ServiceInfo{}
+
 	for _, p := range pods.Items {
 		// check if pod has too many restarts and not running
 		for _, containerStatus := range p.Status.ContainerStatuses {
@@ -101,17 +104,18 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 			}
 		}
 
-		// below are checks only need for one pod from the same sets of pods
+		// below are checks only needed for one pod from the same sets of pods
 		podNameSlice := strings.Split(p.Name, "-")
 		podBaseName := strings.Join(podNameSlice[:len(podNameSlice)-1], "-")
-		if s, ok := ServiceInfos[podBaseName]; ok {
-			s.NumPods += 1
+		if _, ok := podInfos[podBaseName]; ok {
 			// same type of pod already exists in the map, no need to proceed the following checks
+			l.Info("Skip some checks for same set of pods", "pod", req.Name, "basename", podBaseName)
 			continue
 		}
-		info := ServiceInfo{Name: podBaseName, NumPods: 1}
-		// TODO: add checks for pods
-		// check what deployment the service pod belongs to
+		info := PodInfo{Name: podBaseName}
+		podInfos[podBaseName] = &info
+
+		// check what deployment the pod belongs to
 		deployments := appsv1.DeploymentList{}
 		if err := r.List(ctx, &deployments, &client.ListOptions{Namespace: req.Namespace}); err != nil {
 			l.Error(err, "unable to fetch Deployments")
@@ -240,7 +244,6 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 			}
 		}
 
-		ServiceInfos[podBaseName] = &info
 	}
 
 	return ctrl.Result{}, nil
@@ -248,9 +251,10 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 func (r *PodEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	l := r.Log.WithName("Setup")
+	podInfos = map[string]*PodInfo{}
 	if err := mgr.GetFieldIndexer().IndexField(&corev1.Pod{}, ".metadata.name", func(rawObj runtime.Object) []string {
 		pod := rawObj.(*corev1.Pod)
-		l.Info("index field", "pod", pod.Name)
+		l.Info("indexing", "pod", pod.Name)
 		return []string{pod.Name}
 	}); err != nil {
 		return err
@@ -259,7 +263,6 @@ func (r *PodEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&watcherv1.PodEvaluator{}).
 		For(&corev1.Pod{}).
 		WithEventFilter(predicate.Funcs{
-			// While we do not care what the event contains, we should not handle Delete events or Unknown / Generic events
 			CreateFunc:  func(e event.CreateEvent) bool { return true },
 			DeleteFunc:  func(e event.DeleteEvent) bool { return false },
 			UpdateFunc:  func(e event.UpdateEvent) bool { return true },

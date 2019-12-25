@@ -37,7 +37,16 @@ spec:
           properties:
             canary:
               description: Canary is used to check if there's canary deployment define
+              properties:
+                enabled:
+                  type: boolean
               type: object
+            ignoreNamespaces:
+              description: IgnoreNamespaces is the list of namespaces (string) to
+                ignore
+              items:
+                type: string
+              type: array
           type: object
         status:
           description: DeploymentEvaluatorStatus defines the observed state of DeploymentEvaluator

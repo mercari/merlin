@@ -4,4 +4,12 @@ metadata:
   name: deployment-evaluator
 spec:
   # Add fields here
-  canary: {}
+  canary:
+    enabled: true
+  ignoreNamespaces:
+    - kube-system
+    - isto-system
+    - test
+    - spinnaker
+    - cert-manager
+    - prometheus
