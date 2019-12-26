@@ -5,6 +5,8 @@ resources:
 - bases/watcher.merlin.mercari.com_podevaluators.yaml
 - bases/watcher.merlin.mercari.com_notifiers.yaml
 - bases/watcher.merlin.mercari.com_deploymentevaluators.yaml
+- bases/watcher.merlin.mercari.com_hpaevaluators.yaml
+- bases/watcher.merlin.mercari.com_pdbevaluators.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
