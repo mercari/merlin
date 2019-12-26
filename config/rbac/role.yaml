@@ -85,6 +85,26 @@ rules:
 - apiGroups:
   - watcher.merlin.mercari.com
   resources:
+  - hpaevaluators
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - watcher.merlin.mercari.com
+  resources:
+  - hpaevaluators/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - watcher.merlin.mercari.com
+  resources:
   - podevaluators
   verbs:
   - create
