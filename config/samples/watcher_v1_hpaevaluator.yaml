@@ -1,0 +1,14 @@
+apiVersion: watcher.merlin.mercari.com/v1
+kind: HPAEvaluator
+metadata:
+  name: hpa-evaluator
+spec:
+  # Add fields here
+  ignoreNamespaces:
+    - kube-system
+    - isto-system
+    - test
+    - spinnaker
+    - cert-manager
+    - prometheus
+

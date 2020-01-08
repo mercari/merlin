@@ -1,0 +1,15 @@
+apiVersion: watcher.merlin.mercari.com/v1
+kind: NamespaceEvaluator
+metadata:
+  name: namespace-evaluator
+spec:
+  # Add fields here
+  ignoreNamespaces:
+    - kube-system
+    - isto-system
+    - test
+    - spinnaker
+    - cert-manager
+    - prometheus
+  checks:
+    - istio-injection: "true"

@@ -1,0 +1,14 @@
+apiVersion: watcher.merlin.mercari.com/v1
+kind: PDBEvaluator
+metadata:
+  name: pdb-evaluator
+spec:
+  # Add fields here
+  ignoreNamespaces:
+    - kube-system
+    - isto-system
+    - test
+    - spinnaker
+    - cert-manager
+    - prometheus
+
