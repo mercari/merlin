@@ -37,20 +37,29 @@ type HPAEvaluatorReconciler struct {
 
 // +kubebuilder:rbac:groups=watcher.merlin.mercari.com,resources=hpaevaluators,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=watcher.merlin.mercari.com,resources=hpaevaluators/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=autoscalingv1,resources=hpa,verbs=get;list;watch
 
 func (r *HPAEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Namespace, "HPA name", req.Name)
-	notifiers := watcherv1.Notifiers{}
-	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.NotifiersMetadataName}, &notifiers); err != nil {
-		l.Error(err, "failed to get notifier")
-		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
 	evaluator := watcherv1.HPAEvaluator{}
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.HPAEvaluatorMetadataName}, &evaluator); err != nil {
 		l.Error(err, "failed to get evaluator")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+
+	for _, ignoreNamespace := range evaluator.Spec.IgnoreNamespaces {
+		if req.Namespace == ignoreNamespace {
+			continue
+		}
+	}
+
+	notifiers := watcherv1.Notifiers{}
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.NotifiersMetadataName}, &notifiers); err != nil {
+		l.Error(err, "failed to get notifier")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
 	hpas := autoscalingv1.HorizontalPodAutoscalerList{}
 	if err := r.List(ctx, &hpas, &client.ListOptions{Namespace: req.Namespace}); err != nil {
 		l.Error(err, "unable to fetch hpas")

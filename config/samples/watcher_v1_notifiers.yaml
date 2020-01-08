@@ -5,5 +5,5 @@ metadata:
 spec:
   # Add fields here
   slack:
-    channel: "your_channel"
-    webhook_url: "your_webhook_url"
+    channel: "tmp-bill-test"
+    webhook_url: "https://hooks.slack.com/services/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"

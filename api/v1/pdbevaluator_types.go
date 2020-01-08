@@ -24,6 +24,8 @@ const (
 )
 
 type PDBEvaluatorSpec struct {
+	// IgnoreNamespaces is the list of namespaces (string) to ignore
+	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
 }
 
 type PDBEvaluatorStatus struct {
@@ -46,9 +48,9 @@ type PDBEvaluator struct {
 type PDBEvaluatorList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []HPAEvaluator `json:"items"`
+	Items           []PDBEvaluator `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&HPAEvaluator{}, &HPAEvaluatorList{})
+	SchemeBuilder.Register(&PDBEvaluator{}, &PDBEvaluatorList{})
 }

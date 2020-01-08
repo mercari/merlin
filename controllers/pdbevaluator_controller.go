@@ -39,20 +39,29 @@ type PDBEvaluatorReconciler struct {
 
 // +kubebuilder:rbac:groups=watcher.merlin.mercari.com,resources=pdbevaluators,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=watcher.merlin.mercari.com,resources=pdbevaluators/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=policyv1beta1,resources=pdb,verbs=get;list;watch
 
 func (r *PDBEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Namespace)
-	notifiers := watcherv1.Notifiers{}
-	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.NotifiersMetadataName}, &notifiers); err != nil {
-		l.Error(err, "failed to get notifier")
-		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
 	evaluator := watcherv1.PDBEvaluator{}
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.PDBEvaluatorMetadataName}, &evaluator); err != nil {
 		l.Error(err, "failed to get evaluator")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+
+	for _, ignoreNamespace := range evaluator.Spec.IgnoreNamespaces {
+		if req.Namespace == ignoreNamespace {
+			continue
+		}
+	}
+
+	notifiers := watcherv1.Notifiers{}
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.NotifiersMetadataName}, &notifiers); err != nil {
+		l.Error(err, "failed to get notifier")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
 	pdbs := policyv1beta1.PodDisruptionBudgetList{}
 	if err := r.List(ctx, &pdbs, &client.ListOptions{Namespace: req.Namespace}); err != nil {
 		l.Error(err, "unable to fetch PDBs")
