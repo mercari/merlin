@@ -48,10 +48,8 @@ func (r *HPAEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	for _, ignoreNamespace := range evaluator.Spec.IgnoreNamespaces {
-		if req.Namespace == ignoreNamespace {
-			continue
-		}
+	if evaluator.IsNamespaceIgnored(req.Namespace) {
+		return ctrl.Result{}, nil
 	}
 
 	notifiers := watcherv1.Notifiers{}

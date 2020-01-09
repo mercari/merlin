@@ -43,6 +43,15 @@ type HPAEvaluator struct {
 	Status HPAEvaluatorStatus `json:"status,omitempty"`
 }
 
+func (in *HPAEvaluator) IsNamespaceIgnored(namespace string) bool {
+	for _, ignoreNamespace := range in.Spec.IgnoreNamespaces {
+		if namespace == ignoreNamespace {
+			return true
+		}
+	}
+	return false
+}
+
 // +kubebuilder:object:root=true
 
 type HPAEvaluatorList struct {

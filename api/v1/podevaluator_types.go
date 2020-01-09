@@ -54,6 +54,15 @@ type PodEvaluator struct {
 	Status PodEvaluatorStatus `json:"status,omitempty"`
 }
 
+func (in *PodEvaluator) IsNamespaceIgnored(namespace string) bool {
+	for _, ignoreNamespace := range in.Spec.IgnoreNamespaces {
+		if namespace == ignoreNamespace {
+			return true
+		}
+	}
+	return false
+}
+
 // +kubebuilder:object:root=true
 
 // PodEvaluatorList contains a list of PodEvaluator

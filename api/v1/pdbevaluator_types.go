@@ -43,6 +43,15 @@ type PDBEvaluator struct {
 	Status PDBEvaluatorStatus `json:"status,omitempty"`
 }
 
+func (in *PDBEvaluator) IsNamespaceIgnored(namespace string) bool {
+	for _, ignoreNamespace := range in.Spec.IgnoreNamespaces {
+		if namespace == ignoreNamespace {
+			return true
+		}
+	}
+	return false
+}
+
 // +kubebuilder:object:root=true
 
 type PDBEvaluatorList struct {

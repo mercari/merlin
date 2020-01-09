@@ -53,6 +53,15 @@ type NamespaceEvaluator struct {
 	Status NamespaceEvaluatorStatus `json:"status,omitempty"`
 }
 
+func (in *NamespaceEvaluator) IsNamespaceIgnored(namespace string) bool {
+	for _, ignoreNamespace := range in.Spec.IgnoreNamespaces {
+		if namespace == ignoreNamespace {
+			return true
+		}
+	}
+	return false
+}
+
 // +kubebuilder:object:root=true
 
 // NamespaceEvaluatorList contains a list of NamespaceEvaluator

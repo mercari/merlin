@@ -58,6 +58,15 @@ type DeploymentEvaluator struct {
 	Status DeploymentEvaluatorStatus `json:"status,omitempty"`
 }
 
+func (in *DeploymentEvaluator) IsNamespaceIgnored(namespace string) bool {
+	for _, ignoreNamespace := range in.Spec.IgnoreNamespaces {
+		if namespace == ignoreNamespace {
+			return true
+		}
+	}
+	return false
+}
+
 // +kubebuilder:object:root=true
 
 // DeploymentEvaluatorList contains a list of DeploymentEvaluator
