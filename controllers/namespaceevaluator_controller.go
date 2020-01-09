@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"strconv"
+	"strings"
 
 	watcherv1 "github.com/kouzoh/merlin/api/v1"
 )
@@ -65,20 +65,25 @@ func (r *NamespaceEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result,
 		return ctrl.Result{}, ignoreNotFound(err)
 	}
 
-	for _, check := range evaluator.Spec.Checks {
-		if istioInjection, ok := check[watcherv1.NamespaceCheckIstioInjection]; ok {
-			isCheckIstioInjection, err := strconv.ParseBool(istioInjection)
-			if err != nil {
-				l.Error(err, fmt.Sprintf("Failed to parse istio injection value '%s' to boolean", istioInjection))
+	if evaluator.Spec.IstioInjection.Label == watcherv1.LabelKeyExists ||
+		evaluator.Spec.IstioInjection.Label == watcherv1.LabelKeyFalse ||
+		evaluator.Spec.IstioInjection.Label == watcherv1.LabelKeyTrue {
+		istioInjectionLabelExpected := strings.ToLower(evaluator.Spec.IstioInjection.Label)
+		istioInjectionLabel, ok := namespace.Labels[watcherv1.NamespaceIstioInjecitonLabelKey]
+		if !ok {
+			msg := "Namespace has no istio-injection defined"
+			l.Info(msg)
+			if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
+				l.Error(err, "Failed to send message to slack")
 			}
-			if isCheckIstioInjection {
-				if _, ok := namespace.Labels[watcherv1.NamespaceCheckIstioInjection]; !ok {
-					msg := "Namaespace has no istio-injection defined"
-					l.Info(msg)
-					if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
-						l.Error(err, "Failed to send message to slack")
-					}
-				}
+		}
+
+		if (istioInjectionLabelExpected == watcherv1.LabelKeyTrue || istioInjectionLabelExpected == watcherv1.LabelKeyFalse) &&
+			istioInjectionLabel != istioInjectionLabelExpected {
+			msg := fmt.Sprintf("Namespace's istio-injection label '%s' is different from expected '%s'", istioInjectionLabel, istioInjectionLabelExpected)
+			l.Info(msg)
+			if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
+				l.Error(err, "Failed to send message to slack")
 			}
 		}
 	}

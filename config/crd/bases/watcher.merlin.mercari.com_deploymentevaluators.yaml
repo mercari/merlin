@@ -47,6 +47,13 @@ spec:
               items:
                 type: string
               type: array
+            replica:
+              description: Replica is used to check if there are enough pods for the
+                specified replicas
+              properties:
+                enabled:
+                  type: boolean
+              type: object
           type: object
         status:
           description: DeploymentEvaluatorStatus defines the observed state of DeploymentEvaluator

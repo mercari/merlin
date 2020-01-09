@@ -44,12 +44,7 @@ type PDBEvaluator struct {
 }
 
 func (in *PDBEvaluator) IsNamespaceIgnored(namespace string) bool {
-	for _, ignoreNamespace := range in.Spec.IgnoreNamespaces {
-		if namespace == ignoreNamespace {
-			return true
-		}
-	}
-	return false
+	return IsItemInSlice(namespace, in.Spec.IgnoreNamespaces)
 }
 
 // +kubebuilder:object:root=true

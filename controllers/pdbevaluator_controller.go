@@ -43,7 +43,7 @@ type PDBEvaluatorReconciler struct {
 
 func (r *PDBEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Namespace, "PDB name", req.Name)
+	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Namespace)
 	evaluator := watcherv1.PDBEvaluator{}
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.PDBEvaluatorMetadataName}, &evaluator); err != nil {
 		l.Error(err, "failed to get evaluator")
@@ -78,8 +78,8 @@ func (r *PDBEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 			return ctrl.Result{}, ignoreNotFound(err)
 		}
 		if len(pods.Items) == 0 {
-			msg := fmt.Sprintf("PDB `%s` in `%s` namespace has no target pods", pdb.Name, pdb.Namespace)
-			l.Info(msg, "namespace", req.Namespace, "pdb", pdb.Name)
+			msg := fmt.Sprintf("PDB `%s` has no target pods", pdb.Name)
+			l.Info(msg)
 			if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
 				l.Error(err, "Failed to send message to slack")
 			}

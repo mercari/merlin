@@ -6,6 +6,8 @@ spec:
   # Add fields here
   canary:
     enabled: true
+  replica:
+    enabled: true
   ignoreNamespaces:
     - kube-system
     - isto-system

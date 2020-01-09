@@ -44,12 +44,7 @@ type HPAEvaluator struct {
 }
 
 func (in *HPAEvaluator) IsNamespaceIgnored(namespace string) bool {
-	for _, ignoreNamespace := range in.Spec.IgnoreNamespaces {
-		if namespace == ignoreNamespace {
-			return true
-		}
-	}
-	return false
+	return IsItemInSlice(namespace, in.Spec.IgnoreNamespaces)
 }
 
 // +kubebuilder:object:root=true

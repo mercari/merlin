@@ -20,8 +20,11 @@ import (
 )
 
 const (
-	NamespaceEvaluatorMetadataName = "namespace-evaluator"
-	NamespaceCheckIstioInjection   = "istio-injection"
+	NamespaceEvaluatorMetadataName  = "namespace-evaluator"
+	NamespaceIstioInjecitonLabelKey = "istio-injection"
+	LabelKeyExists                  = "exists"
+	LabelKeyTrue                    = "true"
+	LabelKeyFalse                   = "false"
 )
 
 // NamespaceEvaluatorSpec defines the desired state of NamespaceEvaluator
@@ -32,7 +35,11 @@ type NamespaceEvaluatorSpec struct {
 	// IgnoreNamespaces is the list of namespaces (string) to ignore
 	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
 	// Checks is the list of checks to perform for the namespace
-	Checks []map[string]string `json:"checks,omitempty"`
+	IstioInjection IstioInjection `json:"istioInjection,omitempty"`
+}
+
+type IstioInjection struct {
+	Label string `json:"label"`
 }
 
 // NamespaceEvaluatorStatus defines the observed state of NamespaceEvaluator
@@ -54,12 +61,7 @@ type NamespaceEvaluator struct {
 }
 
 func (in *NamespaceEvaluator) IsNamespaceIgnored(namespace string) bool {
-	for _, ignoreNamespace := range in.Spec.IgnoreNamespaces {
-		if namespace == ignoreNamespace {
-			return true
-		}
-	}
-	return false
+	return IsItemInSlice(namespace, in.Spec.IgnoreNamespaces)
 }
 
 // +kubebuilder:object:root=true

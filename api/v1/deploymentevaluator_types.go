@@ -29,13 +29,16 @@ type Canary struct {
 	Enabled bool `json:"enabled,omitempty"`
 }
 
+type Replica struct {
+	Enabled bool `json:"enabled,omitempty"`
+}
+
 // DeploymentEvaluatorSpec defines the desired state of DeploymentEvaluator
 type DeploymentEvaluatorSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// Canary is used to check if there's canary deployment define
 	Canary Canary `json:"canary,omitempty"`
+	// Replica is used to check if there are enough pods for the specified replicas
+	Replica Replica `json:"replica,omitempty"`
 	// IgnoreNamespaces is the list of namespaces (string) to ignore
 	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
 }
@@ -59,12 +62,7 @@ type DeploymentEvaluator struct {
 }
 
 func (in *DeploymentEvaluator) IsNamespaceIgnored(namespace string) bool {
-	for _, ignoreNamespace := range in.Spec.IgnoreNamespaces {
-		if namespace == ignoreNamespace {
-			return true
-		}
-	}
-	return false
+	return IsItemInSlice(namespace, in.Spec.IgnoreNamespaces)
 }
 
 // +kubebuilder:object:root=true

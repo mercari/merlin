@@ -11,5 +11,5 @@ spec:
     - spinnaker
     - cert-manager
     - prometheus
-  checks:
-    - istio-injection: "true"
+  istioInjection:
+    label: "exists"

@@ -34,19 +34,20 @@ spec:
         spec:
           description: NamespaceEvaluatorSpec defines the desired state of NamespaceEvaluator
           properties:
-            checks:
-              description: Checks is the list of checks to perform for the namespace
-              items:
-                additionalProperties:
-                  type: string
-                type: object
-              type: array
             ignoreNamespaces:
               description: IgnoreNamespaces is the list of namespaces (string) to
                 ignore
               items:
                 type: string
               type: array
+            istioInjection:
+              description: Checks is the list of checks to perform for the namespace
+              properties:
+                label:
+                  type: string
+              required:
+              - label
+              type: object
           type: object
         status:
           description: NamespaceEvaluatorStatus defines the observed state of NamespaceEvaluator

@@ -27,9 +27,6 @@ const (
 
 // PodEvaluatorSpec defines the desired state of PodEvaluator
 type PodEvaluatorSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// Restarts is the number of restarts limit before we send out a notification
 	Restarts int32 `json:"crashes,omitempty"`
 	// IgnoreNamespaces is the list of namespaces (string) to ignore
@@ -55,12 +52,7 @@ type PodEvaluator struct {
 }
 
 func (in *PodEvaluator) IsNamespaceIgnored(namespace string) bool {
-	for _, ignoreNamespace := range in.Spec.IgnoreNamespaces {
-		if namespace == ignoreNamespace {
-			return true
-		}
-	}
-	return false
+	return IsItemInSlice(namespace, in.Spec.IgnoreNamespaces)
 }
 
 // +kubebuilder:object:root=true

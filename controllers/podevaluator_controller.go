@@ -67,7 +67,7 @@ var podInfos = map[string]*PodInfo{}
 
 func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Namespace, "pod name", req.Name)
+	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Namespace)
 	evaluator := watcherv1.PodEvaluator{}
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.PodEvaluatorMetadataName}, &evaluator); err != nil {
 		l.Error(err, "failed to get evaluator")
@@ -95,7 +95,7 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		for _, containerStatus := range p.Status.ContainerStatuses {
 			if containerStatus.RestartCount > evaluator.Spec.Restarts && p.Status.Phase != corev1.PodRunning {
 				msg := fmt.Sprintf("Pod `%s` has too many restarts and it's not running", req.NamespacedName)
-				l.Info(msg, "namespace", req.Namespace, "pod", req.Name, "restart limit", evaluator.Spec.Restarts)
+				l.Info(msg, "pod", req.Name, "restart limit", evaluator.Spec.Restarts)
 				if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
 					l.Error(err, "Failed to send message to slack")
 				}
@@ -151,7 +151,7 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 		if info.Deployment == "" && info.ReplicaSet == "" {
 			msg := fmt.Sprintf("Pod `%s` is not managed by a deployment or replicaset", req.NamespacedName)
-			l.Info(msg, "namespace", req.Namespace, "pod", req.Name)
+			l.Info(msg, "pod", req.Name)
 			if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
 				l.Error(err, "Failed to send message to slack")
 			}
@@ -184,7 +184,7 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 			}
 			if !isJob {
 				msg := fmt.Sprintf("Pod `%s` is not used by a service", req.NamespacedName)
-				l.Info(msg, "namespace", req.Namespace, "pod", req.Name)
+				l.Info(msg, "pod", req.Name)
 				if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
 					l.Error(err, "Failed to send message to slack")
 				}
@@ -211,7 +211,7 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		}
 		if info.PDB == "" {
 			msg := fmt.Sprintf("Pod `%s` is not managed by PDB", req.NamespacedName)
-			l.Info(msg, "namespace", req.Namespace, "pod", req.Name)
+			l.Info(msg, "pod", req.Name)
 			if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
 				l.Error(err, "Failed to send message to slack")
 			}
@@ -236,7 +236,7 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		}
 		if info.HPA == "" {
 			msg := fmt.Sprintf("Pod `%s` is not managed by HPA", req.NamespacedName)
-			l.Info(msg, "namespace", req.Namespace, "pod", req.Name)
+			l.Info(msg, "pod", req.Name)
 			if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
 				l.Error(err, "Failed to send message to slack")
 			}

@@ -36,7 +36,6 @@ var (
 
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
-
 	_ = watcherv1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
