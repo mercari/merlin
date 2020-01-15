@@ -43,23 +43,36 @@ type DeploymentEvaluatorReconciler struct {
 
 func (r *DeploymentEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Namespace, "deployment name", req.Name)
+	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Namespace, "deployment", req.Name)
 	evaluator := watcherv1.DeploymentEvaluator{}
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.DeploymentEvaluatorMetadataName}, &evaluator); err != nil {
 		l.Error(err, "failed to get evaluator")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	for _, ignoreNamespace := range evaluator.Spec.IgnoreNamespaces {
-		if req.Namespace == ignoreNamespace {
-			continue
-		}
+	if evaluator.IsNamespaceIgnored(req.Namespace) {
+		return ctrl.Result{}, nil
 	}
 
 	notifiers := watcherv1.Notifiers{}
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.NotifiersMetadataName}, &notifiers); err != nil {
 		l.Error(err, "failed to get notifier")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	if evaluator.Spec.Replica.Enabled {
+		deployment := appsv1.Deployment{}
+		if err := r.Client.Get(ctx, req.NamespacedName, &deployment); err != nil {
+			l.Error(err, "failed to get deployment")
+			return ctrl.Result{}, client.IgnoreNotFound(err)
+		}
+		if deployment.Spec.Replicas != &deployment.Status.AvailableReplicas {
+			msg := fmt.Sprintf("Deployment has not enough replicas, available: %v, desired: %v", deployment.Status.AvailableReplicas, deployment.Spec.Replicas)
+			l.Info(msg)
+			if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
+				l.Error(err, "Failed to send message to slack")
+			}
+		}
 	}
 
 	if evaluator.Spec.Canary.Enabled {
@@ -76,15 +89,15 @@ func (r *DeploymentEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 			}
 		}
 		if !hasCanaryDeployment {
-			msg := fmt.Sprintf("Namespace `%s` has no canary deployment", req.Namespace)
-			l.Info(msg, "namespace", req.Namespace)
+			msg := "No canary deployment found"
+			l.Info(msg)
 			if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
 				l.Error(err, "Failed to send message to slack")
 			}
 		}
 	}
 
-	// TODO: add other checks for deployments
+	// other checks for deployments
 
 	return ctrl.Result{}, nil
 }

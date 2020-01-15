@@ -105,6 +105,26 @@ rules:
 - apiGroups:
   - watcher.merlin.mercari.com
   resources:
+  - namespaceevaluators
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - watcher.merlin.mercari.com
+  resources:
+  - namespaceevaluators/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - watcher.merlin.mercari.com
+  resources:
   - pdbevaluators
   verbs:
   - create

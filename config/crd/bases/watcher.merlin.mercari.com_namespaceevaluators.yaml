@@ -6,19 +6,18 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.2.4
   creationTimestamp: null
-  name: deploymentevaluators.watcher.merlin.mercari.com
+  name: namespaceevaluators.watcher.merlin.mercari.com
 spec:
   group: watcher.merlin.mercari.com
   names:
-    kind: DeploymentEvaluator
-    listKind: DeploymentEvaluatorList
-    plural: deploymentevaluators
-    singular: deploymentevaluator
+    kind: NamespaceEvaluator
+    listKind: NamespaceEvaluatorList
+    plural: namespaceevaluators
+    singular: namespaceevaluator
   scope: Cluster
   validation:
     openAPIV3Schema:
-      description: DeploymentEvaluator is the Schema for the deploymentevaluators
-        API
+      description: NamespaceEvaluator is the Schema for the namespaceevaluators API
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -33,30 +32,25 @@ spec:
         metadata:
           type: object
         spec:
-          description: DeploymentEvaluatorSpec defines the desired state of DeploymentEvaluator
+          description: NamespaceEvaluatorSpec defines the desired state of NamespaceEvaluator
           properties:
-            canary:
-              description: Canary is used to check if there's canary deployment define
-              properties:
-                enabled:
-                  type: boolean
-              type: object
             ignoreNamespaces:
               description: IgnoreNamespaces is the list of namespaces (string) to
                 ignore
               items:
                 type: string
               type: array
-            replica:
-              description: Replica is used to check if there are enough pods for the
-                specified replicas
+            istioInjection:
+              description: Checks is the list of checks to perform for the namespace
               properties:
-                enabled:
-                  type: boolean
+                label:
+                  type: string
+              required:
+              - label
               type: object
           type: object
         status:
-          description: DeploymentEvaluatorStatus defines the observed state of DeploymentEvaluator
+          description: NamespaceEvaluatorStatus defines the observed state of NamespaceEvaluator
           type: object
       type: object
   version: v1

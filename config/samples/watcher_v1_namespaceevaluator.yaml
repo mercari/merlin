@@ -1,13 +1,9 @@
 apiVersion: watcher.merlin.mercari.com/v1
-kind: DeploymentEvaluator
+kind: NamespaceEvaluator
 metadata:
-  name: deployment-evaluator
+  name: namespace-evaluator
 spec:
   # Add fields here
-  canary:
-    enabled: true
-  replica:
-    enabled: true
   ignoreNamespaces:
     - kube-system
     - isto-system
@@ -15,3 +11,5 @@ spec:
     - spinnaker
     - cert-manager
     - prometheus
+  istioInjection:
+    label: "exists"

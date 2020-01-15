@@ -24,6 +24,8 @@ const (
 )
 
 type HPAEvaluatorSpec struct {
+	// IgnoreNamespaces is the list of namespaces (string) to ignore
+	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
 }
 
 type HPAEvaluatorStatus struct {
@@ -39,6 +41,10 @@ type HPAEvaluator struct {
 
 	Spec   HPAEvaluatorSpec   `json:"spec,omitempty"`
 	Status HPAEvaluatorStatus `json:"status,omitempty"`
+}
+
+func (in *HPAEvaluator) IsNamespaceIgnored(namespace string) bool {
+	return IsItemInSlice(namespace, in.Spec.IgnoreNamespaces)
 }
 
 // +kubebuilder:object:root=true

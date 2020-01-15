@@ -28,9 +28,6 @@ const (
 
 // NotifiersSpec defines the desired state of Notifiers
 type NotifiersSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// Slack is the notifier for slack
 	Slack Slack `json:"slack,omitempty"`
 	// TODO: add a wrapper to validate and send to all notifiers
