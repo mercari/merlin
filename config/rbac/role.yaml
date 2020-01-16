@@ -55,6 +55,14 @@ rules:
   - list
   - watch
 - apiGroups:
+  - corev1
+  resources:
+  - svc
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - policyv1beta1
   resources:
   - pdb
@@ -158,6 +166,26 @@ rules:
   - watcher.merlin.mercari.com
   resources:
   - podevaluators/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - watcher.merlin.mercari.com
+  resources:
+  - svcevaluators
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - watcher.merlin.mercari.com
+  resources:
+  - svcevaluators/status
   verbs:
   - get
   - patch

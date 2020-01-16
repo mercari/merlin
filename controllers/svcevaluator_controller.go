@@ -19,6 +19,9 @@ import (
 	"context"
 	"fmt"
 
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +38,10 @@ type SVCEvaluatorReconciler struct {
 	Log    logr.Logger
 	Scheme *runtime.Scheme
 }
+
+// +kubebuilder:rbac:groups=watcher.merlin.mercari.com,resources=svcevaluators,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=watcher.merlin.mercari.com,resources=svcevaluators/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=corev1,resources=svc,verbs=get;list;watch
 
 func (r *SVCEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
@@ -75,4 +82,26 @@ func (r *SVCEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		}
 	}
 	return ctrl.Result{}, nil
+}
+
+func (r *SVCEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	l := r.Log.WithName("Setup")
+	if err := mgr.GetFieldIndexer().IndexField(&corev1.Service{}, ".metadata.name", func(rawObj runtime.Object) []string {
+		svc := rawObj.(*corev1.Service)
+		l.Info("index field", "service", svc.Name)
+		return []string{svc.Name}
+	}); err != nil {
+		return err
+	}
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&watcherv1.SVCEvaluator{}).
+		For(&corev1.Service{}).
+		WithEventFilter(predicate.Funcs{
+			// While we do not care what the event contains, we should not handle Delete events or Unknown / Generic events
+			CreateFunc:  func(e event.CreateEvent) bool { return true },
+			DeleteFunc:  func(e event.DeleteEvent) bool { return false },
+			UpdateFunc:  func(e event.UpdateEvent) bool { return true },
+			GenericFunc: func(e event.GenericEvent) bool { return true },
+		}).
+		Complete(r)
 }
