@@ -42,6 +42,10 @@ type SVCEvaluator struct {
 	Status SVCEvaluatorStatus `json:"status,omitempty"`
 }
 
+func (in *SVCEvaluator) IsNamespaceIgnored(namespace string) bool {
+	return IsItemInSlice(namespace, in.Spec.IgnoreNamespaces)
+}
+
 // +kubebuilder:object:root=true
 
 type SVCEvaluatorList struct {

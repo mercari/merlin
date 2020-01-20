@@ -42,6 +42,8 @@ type SVCEvaluatorReconciler struct {
 // +kubebuilder:rbac:groups=watcher.merlin.mercari.com,resources=svcevaluators,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=watcher.merlin.mercari.com,resources=svcevaluators/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=corev1,resources=svc,verbs=get;list;watch
+// +kubebuilder:rbac:groups=corev1,resources=services,verbs=get;list;watch
+// +kubebuilder:rbac:groups=corev1,resources=pods,verbs=get;list;watch
 
 func (r *SVCEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
