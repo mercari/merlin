@@ -8,6 +8,7 @@ resources:
 - bases/watcher.merlin.mercari.com_hpaevaluators.yaml
 - bases/watcher.merlin.mercari.com_pdbevaluators.yaml
 - bases/watcher.merlin.mercari.com_namespaceevaluators.yaml
+- bases/watcher.merlin.mercari.com_svcevaluators.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
@@ -17,6 +18,7 @@ patchesStrategicMerge:
 #- patches/webhook_in_notifiers.yaml
 #- patches/webhook_in_deploymentevaluators.yaml
 #- patches/webhook_in_namespaceevaluators.yaml
+#- patches/webhook_in_svcevaluators.yaml
 # +kubebuilder:scaffold:crdkustomizewebhookpatch
 
 # [CERTMANAGER] To enable webhook, uncomment all the sections with [CERTMANAGER] prefix.
@@ -25,6 +27,7 @@ patchesStrategicMerge:
 #- patches/cainjection_in_notifiers.yaml
 #- patches/cainjection_in_deploymentevaluators.yaml
 #- patches/cainjection_in_namespaceevaluators.yaml
+#- patches/cainjection_in_svcevaluators.yaml
 # +kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # the following config is for teaching kustomize how to do kustomization for CRDs.

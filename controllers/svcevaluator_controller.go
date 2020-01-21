@@ -19,40 +19,39 @@ import (
 	"context"
 	"fmt"
 
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	watcherv1 "github.com/kouzoh/merlin/api/v1"
 )
 
-type PDBEvaluatorReconciler struct {
+type SVCEvaluatorReconciler struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=watcher.merlin.mercari.com,resources=pdbevaluators,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=watcher.merlin.mercari.com,resources=pdbevaluators/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=policyv1beta1,resources=pdb,verbs=get;list;watch
+// +kubebuilder:rbac:groups=watcher.merlin.mercari.com,resources=svcevaluators,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=watcher.merlin.mercari.com,resources=svcevaluators/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=corev1,resources=svc,verbs=get;list;watch
+// +kubebuilder:rbac:groups=corev1,resources=services,verbs=get;list;watch
+// +kubebuilder:rbac:groups=corev1,resources=pods,verbs=get;list;watch
 
-func (r *PDBEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *SVCEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Namespace)
-	evaluator := watcherv1.PDBEvaluator{}
-	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.PDBEvaluatorMetadataName}, &evaluator); err != nil {
+	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Namespace, "SVC Name", req.Name)
+	evaluator := watcherv1.SVCEvaluator{}
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.SVCEvaluatorMetadataName}, &evaluator); err != nil {
 		l.Error(err, "failed to get evaluator")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
-
-	if evaluator.IsNamespaceIgnored(req.Namespace) {
-		return ctrl.Result{}, nil
 	}
 
 	notifiers := watcherv1.Notifiers{}
@@ -61,26 +60,24 @@ func (r *PDBEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	pdbs := policyv1beta1.PodDisruptionBudgetList{}
-	if err := r.List(ctx, &pdbs, &client.ListOptions{Namespace: req.Namespace}); err != nil {
-		l.Error(err, "unable to fetch PDBs")
+	svcs := corev1.ServiceList{}
+	if err := r.List(ctx, &svcs, &client.ListOptions{Namespace: req.Namespace}); err != nil {
+		l.Error(err, "unable to fetch Services")
 		return ctrl.Result{}, ignoreNotFound(err)
 	}
-	for _, pdb := range pdbs.Items {
-		pdbSelector := v1.SetAsLabelSelector(pdb.Spec.Selector.MatchLabels).String()
+
+	for _, svc := range svcs.Items {
+		lSelector, _ := v1.LabelSelectorAsSelector(v1.SetAsLabelSelector(labels.Set(svc.Spec.Selector)))
 		pods := corev1.PodList{}
 		if err := r.List(ctx, &pods, &client.ListOptions{
-			Namespace: req.Namespace,
-			Raw: &v1.ListOptions{
-				LabelSelector: pdbSelector,
-			},
+			Namespace:     req.Namespace,
+			LabelSelector: lSelector,
 		}); err != nil {
-			l.Error(err, "unable to fetch Pods")
-			return ctrl.Result{}, ignoreNotFound(err)
+			l.Error(err, "unable to fetch pods")
 		}
 		if len(pods.Items) == 0 {
-			msg := fmt.Sprintf("PDB `%s` has no target pods", pdb.Name)
-			l.Info(msg)
+			msg := fmt.Sprintf("Service `%s` in `%s` namespace has no pods matched", svc.Name, svc.Namespace)
+			l.Info(msg, "namespace", req.Namespace, "svc", svc.Name)
 			if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
 				l.Error(err, "Failed to send message to slack")
 			}
@@ -89,18 +86,18 @@ func (r *PDBEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	return ctrl.Result{}, nil
 }
 
-func (r *PDBEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *SVCEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	l := r.Log.WithName("Setup")
-	if err := mgr.GetFieldIndexer().IndexField(&policyv1beta1.PodDisruptionBudget{}, ".metadata.name", func(rawObj runtime.Object) []string {
-		pdb := rawObj.(*policyv1beta1.PodDisruptionBudget)
-		l.Info("index field", "pdb", pdb.Name)
-		return []string{pdb.Name}
+	if err := mgr.GetFieldIndexer().IndexField(&corev1.Service{}, ".metadata.name", func(rawObj runtime.Object) []string {
+		svc := rawObj.(*corev1.Service)
+		l.Info("index field", "service", svc.Name)
+		return []string{svc.Name}
 	}); err != nil {
 		return err
 	}
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&watcherv1.PDBEvaluator{}).
-		For(&policyv1beta1.PodDisruptionBudget{}).
+		For(&watcherv1.SVCEvaluator{}).
+		For(&corev1.Service{}).
 		WithEventFilter(predicate.Funcs{
 			// While we do not care what the event contains, we should not handle Delete events or Unknown / Generic events
 			CreateFunc:  func(e event.CreateEvent) bool { return true },
