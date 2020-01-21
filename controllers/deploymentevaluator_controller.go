@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-logr/logr"
+	watcherv1 "github.com/kouzoh/merlin/api/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -26,8 +27,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"strings"
+	"time"
+)
 
-	watcherv1 "github.com/kouzoh/merlin/api/v1"
+type DeploymentIssue = string
+
+const (
+	DeploymentEvaluatorAnnotationCheckedTime                 = "deploymentevaluator.watcher.merlin.mercari.com/checked-at"
+	DeploymentEvaluatorAnnotationIssue                       = "deploymentevaluator.watcher.merlin.mercari.com/issue"
+	DeploymentHasNoEnoughReplica             DeploymentIssue = "no_enough_replica"
 )
 
 // DeploymentEvaluatorReconciler reconciles a DeploymentEvaluator object
@@ -66,12 +74,20 @@ func (r *DeploymentEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 			l.Error(err, "failed to get deployment")
 			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
+		deployment.Annotations[DeploymentEvaluatorAnnotationCheckedTime] = time.Now().Format(time.RFC3339)
+		deployment.Annotations[DeploymentEvaluatorAnnotationIssue] = ""
+
 		if deployment.Status.AvailableReplicas != *deployment.Spec.Replicas {
 			msg := fmt.Sprintf("Deployment has not enough replicas, available: %v, desired: %d", deployment.Status.AvailableReplicas, *deployment.Spec.Replicas)
 			l.Info(msg)
+			deployment.Annotations[DeploymentEvaluatorAnnotationIssue] = DeploymentHasNoEnoughReplica
 			if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
 				l.Error(err, "Failed to send message to slack")
 			}
+		}
+
+		if err := r.Update(ctx, &deployment); err != nil {
+			l.Error(err, "unable to update deployment annotations")
 		}
 	}
 
@@ -96,9 +112,7 @@ func (r *DeploymentEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 			}
 		}
 	}
-
 	// other checks for deployments
-
 	return ctrl.Result{}, nil
 }
 
