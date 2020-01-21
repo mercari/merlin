@@ -8,4 +8,3 @@ spec:
   - isto-system
   - cert-manager
   - prometheus
-  restarts: 10
