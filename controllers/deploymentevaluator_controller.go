@@ -66,8 +66,8 @@ func (r *DeploymentEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 			l.Error(err, "failed to get deployment")
 			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
-		if deployment.Spec.Replicas != &deployment.Status.AvailableReplicas {
-			msg := fmt.Sprintf("Deployment has not enough replicas, available: %v, desired: %v", deployment.Status.AvailableReplicas, deployment.Spec.Replicas)
+		if deployment.Status.AvailableReplicas != *deployment.Spec.Replicas {
+			msg := fmt.Sprintf("Deployment has not enough replicas, available: %v, desired: %d", deployment.Status.AvailableReplicas, *deployment.Spec.Replicas)
 			l.Info(msg)
 			if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
 				l.Error(err, "Failed to send message to slack")
