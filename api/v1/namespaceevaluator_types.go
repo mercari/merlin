@@ -16,30 +16,20 @@ limitations under the License.
 package v1
 
 import (
+	"github.com/kouzoh/merlin/rules"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
-	NamespaceEvaluatorMetadataName  = "namespace-evaluator"
-	NamespaceIstioInjecitonLabelKey = "istio-injection"
-	LabelKeyExists                  = "exists"
-	LabelKeyTrue                    = "true"
-	LabelKeyFalse                   = "false"
+	NamespaceEvaluatorMetadataName = "namespace-evaluator"
 )
 
 // NamespaceEvaluatorSpec defines the desired state of NamespaceEvaluator
 type NamespaceEvaluatorSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// IgnoreNamespaces is the list of namespaces (string) to ignore
 	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
-	// Checks is the list of checks to perform for the namespace
-	IstioInjection IstioInjection `json:"istioInjection,omitempty"`
-}
-
-type IstioInjection struct {
-	Label string `json:"label"`
+	// Rules is the list of checks to perform for the namespace
+	Rules rules.NamespaceRules `json:"rules,omitempty"`
 }
 
 // NamespaceEvaluatorStatus defines the observed state of NamespaceEvaluator

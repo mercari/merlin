@@ -17,7 +17,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"github.com/go-logr/logr"
 	watcherv1 "github.com/kouzoh/merlin/api/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -26,16 +25,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"strings"
 	"time"
 )
 
 type DeploymentIssue = string
 
 const (
-	DeploymentEvaluatorAnnotationCheckedTime                 = "deploymentevaluator.watcher.merlin.mercari.com/checked-at"
-	DeploymentEvaluatorAnnotationIssue                       = "deploymentevaluator.watcher.merlin.mercari.com/issue"
-	DeploymentHasNoEnoughReplica             DeploymentIssue = "no_enough_replica"
+	DeploymentEvaluatorAnnotationCheckedTime = "deploymentevaluator.watcher.merlin.mercari.com/checked-at"
+	DeploymentEvaluatorAnnotationIssue       = "deploymentevaluator.watcher.merlin.mercari.com/issue"
 )
 
 // DeploymentEvaluatorReconciler reconciles a DeploymentEvaluator object
@@ -52,6 +49,23 @@ type DeploymentEvaluatorReconciler struct {
 func (r *DeploymentEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Namespace, "deployment", req.Name)
+	deployment := appsv1.Deployment{}
+	if err := r.Client.Get(ctx, req.NamespacedName, &deployment); err != nil {
+		l.Error(err, "failed to get deployment")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	if lastChecked, ok := deployment.Annotations[DeploymentEvaluatorAnnotationCheckedTime]; ok {
+		lastCheckedTime, err := time.Parse(time.RFC3339, lastChecked)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		if lastCheckedTime.Add(3 * time.Second).After(time.Now()) {
+			l.Info("last check within 3 sec, will skip")
+			return ctrl.Result{}, err
+		}
+	}
+
 	evaluator := watcherv1.DeploymentEvaluator{}
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.DeploymentEvaluatorMetadataName}, &evaluator); err != nil {
 		l.Error(err, "failed to get evaluator")
@@ -68,50 +82,25 @@ func (r *DeploymentEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if evaluator.Spec.Replica.Enabled {
-		deployment := appsv1.Deployment{}
-		if err := r.Client.Get(ctx, req.NamespacedName, &deployment); err != nil {
-			l.Error(err, "failed to get deployment")
-			return ctrl.Result{}, client.IgnoreNotFound(err)
-		}
-		deployment.Annotations[DeploymentEvaluatorAnnotationCheckedTime] = time.Now().Format(time.RFC3339)
-		deployment.Annotations[DeploymentEvaluatorAnnotationIssue] = ""
+	deployment.SetAnnotations(map[string]string{
+		DeploymentEvaluatorAnnotationCheckedTime: time.Now().Format(time.RFC3339),
+		DeploymentEvaluatorAnnotationIssue:       "",
+	})
 
-		if deployment.Status.AvailableReplicas != *deployment.Spec.Replicas {
-			msg := fmt.Sprintf("Deployment has not enough replicas, available: %v, desired: %d", deployment.Status.AvailableReplicas, *deployment.Spec.Replicas)
-			l.Info(msg)
-			deployment.Annotations[DeploymentEvaluatorAnnotationIssue] = DeploymentHasNoEnoughReplica
-			if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
-				l.Error(err, "Failed to send message to slack")
-			}
-		}
-
-		if err := r.Update(ctx, &deployment); err != nil {
-			l.Error(err, "unable to update deployment annotations")
-		}
+	evaluationResult := evaluator.Spec.Rules.Evaluate(ctx, req, r.Client, deployment)
+	if evaluationResult.Err != nil {
+		l.Error(evaluationResult.Err, "hit error with evaluation")
+		return ctrl.Result{}, evaluationResult.Err
+	}
+	if len(evaluationResult.Issues) > 0 {
+		l.Info("deployment has issues", "issues", evaluationResult.Issues, "deployment", deployment.Name)
+		deployment.Annotations[DeploymentEvaluatorAnnotationIssue] = evaluationResult.Issues.String()
 	}
 
-	if evaluator.Spec.Canary.Enabled {
-		hasCanaryDeployment := false
-		deployments := appsv1.DeploymentList{}
-		if err := r.List(ctx, &deployments, &client.ListOptions{Namespace: req.Namespace}); err != nil {
-			l.Error(err, "unable to fetch Deployments")
-			return ctrl.Result{}, ignoreNotFound(err)
-		}
-		for _, d := range deployments.Items {
-			// TODO: better way to check? e.g., generic checks for canary deployment? and what if a service has multiple deployments..
-			if strings.HasSuffix(d.Name, "-canary") {
-				hasCanaryDeployment = true
-			}
-		}
-		if !hasCanaryDeployment {
-			msg := "No canary deployment found"
-			l.Info(msg)
-			if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
-				l.Error(err, "Failed to send message to slack")
-			}
-		}
+	if err := r.Update(ctx, &deployment); err != nil {
+		l.Error(err, "unable to update deployment annotations")
 	}
+
 	// other checks for deployments
 	return ctrl.Result{}, nil
 }

@@ -40,13 +40,14 @@ spec:
               items:
                 type: string
               type: array
-            istioInjection:
-              description: Checks is the list of checks to perform for the namespace
+            rules:
+              description: Rules is the list of checks to perform for the namespace
               properties:
-                label:
-                  type: string
-              required:
-              - label
+                istioInjection:
+                  properties:
+                    label:
+                      type: string
+                  type: object
               type: object
           type: object
         status:

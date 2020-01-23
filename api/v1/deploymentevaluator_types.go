@@ -16,6 +16,7 @@ limitations under the License.
 package v1
 
 import (
+	"github.com/kouzoh/merlin/rules"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -25,22 +26,12 @@ const (
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-type Canary struct {
-	Enabled bool `json:"enabled,omitempty"`
-}
-
-type Replica struct {
-	Enabled bool `json:"enabled,omitempty"`
-}
-
 // DeploymentEvaluatorSpec defines the desired state of DeploymentEvaluator
 type DeploymentEvaluatorSpec struct {
-	// Canary is used to check if there's canary deployment define
-	Canary Canary `json:"canary,omitempty"`
-	// Replica is used to check if there are enough pods for the specified replicas
-	Replica Replica `json:"replica,omitempty"`
 	// IgnoreNamespaces is the list of namespaces (string) to ignore
 	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
+	//Rules are the rules to check for the evaluator
+	Rules rules.DeploymentRules `json:"rules,omitempty"`
 }
 
 // DeploymentEvaluatorStatus defines the observed state of DeploymentEvaluator

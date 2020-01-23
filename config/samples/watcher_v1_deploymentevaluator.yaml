@@ -4,10 +4,14 @@ metadata:
   name: deployment-evaluator
 spec:
   # Add fields here
-  canary:
-    enabled: true
-  replica:
-    enabled: true
+  rules:
+    canary:
+      description: ""
+      enabled: true
+    replica:
+      description: ""
+      min: 3
+      enabled: true
   ignoreNamespaces:
     - kube-system
     - isto-system
