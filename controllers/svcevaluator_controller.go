@@ -18,12 +18,9 @@ package controllers
 import (
 	"context"
 	"fmt"
-
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
-
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -61,9 +58,9 @@ func (r *SVCEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	svcs := corev1.ServiceList{}
-	if err := r.List(ctx, &svcs, &client.ListOptions{Namespace: req.Namespace}); err != nil {
+	if err := r.List(ctx, &svcs, &client.ListOptions{Namespace: req.Namespace}); err != nil && !apierrs.IsNotFound(err) {
 		l.Error(err, "unable to fetch Services")
-		return ctrl.Result{}, ignoreNotFound(err)
+		return ctrl.Result{}, err
 	}
 
 	for _, svc := range svcs.Items {
@@ -87,23 +84,18 @@ func (r *SVCEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 }
 
 func (r *SVCEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	l := r.Log.WithName("Setup")
+	l := r.Log
 	if err := mgr.GetFieldIndexer().IndexField(&corev1.Service{}, ".metadata.name", func(rawObj runtime.Object) []string {
 		svc := rawObj.(*corev1.Service)
-		l.Info("index field", "service", svc.Name)
+		l.Info("indexing", "service", svc.Name)
 		return []string{svc.Name}
 	}); err != nil {
 		return err
 	}
+	l.Info("init manager")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&watcherv1.SVCEvaluator{}).
 		For(&corev1.Service{}).
-		WithEventFilter(predicate.Funcs{
-			// While we do not care what the event contains, we should not handle Delete events or Unknown / Generic events
-			CreateFunc:  func(e event.CreateEvent) bool { return true },
-			DeleteFunc:  func(e event.DeleteEvent) bool { return false },
-			UpdateFunc:  func(e event.UpdateEvent) bool { return true },
-			GenericFunc: func(e event.GenericEvent) bool { return true },
-		}).
+		WithEventFilter(GetPredicateFuncs(l)).
 		Complete(r)
 }

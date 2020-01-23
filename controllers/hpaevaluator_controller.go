@@ -18,14 +18,12 @@ package controllers
 import (
 	"context"
 	"github.com/go-logr/logr"
+	watcherv1 "github.com/kouzoh/merlin/api/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
-
-	watcherv1 "github.com/kouzoh/merlin/api/v1"
 )
 
 type HPAEvaluatorReconciler struct {
@@ -58,9 +56,9 @@ func (r *HPAEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	hpas := autoscalingv1.HorizontalPodAutoscalerList{}
-	if err := r.List(ctx, &hpas, &client.ListOptions{Namespace: req.Namespace}); err != nil {
+	if err := r.List(ctx, &hpas, &client.ListOptions{Namespace: req.Namespace}); err != nil && !apierrs.IsNotFound(err) {
 		l.Error(err, "unable to fetch hpas")
-		return ctrl.Result{}, ignoreNotFound(err)
+		return ctrl.Result{}, err
 	}
 	for _, hpa := range hpas.Items {
 		if hpa.Spec.MaxReplicas == hpa.Status.CurrentReplicas {
@@ -82,23 +80,18 @@ func (r *HPAEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 }
 
 func (r *HPAEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	l := r.Log.WithName("Setup")
+	l := r.Log
 	if err := mgr.GetFieldIndexer().IndexField(&autoscalingv1.HorizontalPodAutoscaler{}, ".metadata.name", func(rawObj runtime.Object) []string {
 		hpa := rawObj.(*autoscalingv1.HorizontalPodAutoscaler)
-		l.Info("index field", "hpa", hpa.Name)
+		l.Info("indexing", "hpa", hpa.Name)
 		return []string{hpa.Name}
 	}); err != nil {
 		return err
 	}
+	l.Info("init manager")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&watcherv1.HPAEvaluator{}).
 		For(&autoscalingv1.HorizontalPodAutoscaler{}).
-		WithEventFilter(predicate.Funcs{
-			// While we do not care what the event contains, we should not handle Delete events or Unknown / Generic events
-			CreateFunc:  func(e event.CreateEvent) bool { return true },
-			DeleteFunc:  func(e event.DeleteEvent) bool { return false },
-			UpdateFunc:  func(e event.UpdateEvent) bool { return true },
-			GenericFunc: func(e event.GenericEvent) bool { return true },
-		}).
+		WithEventFilter(GetPredicateFuncs(l)).
 		Complete(r)
 }

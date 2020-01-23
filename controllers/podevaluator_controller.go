@@ -27,8 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"strings"
 
 	watcherv1 "github.com/kouzoh/merlin/api/v1"
@@ -85,9 +83,9 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	pods := corev1.PodList{}
-	if err := r.List(ctx, &pods, &client.ListOptions{Namespace: req.Namespace}); err != nil {
+	if err := r.List(ctx, &pods, &client.ListOptions{Namespace: req.Namespace}); err != nil && !apierrs.IsNotFound(err) {
 		l.Error(err, "unable to fetch Pods")
-		return ctrl.Result{}, ignoreNotFound(err)
+		return ctrl.Result{}, err
 	}
 
 	for _, p := range pods.Items {
@@ -115,9 +113,9 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 		// check what deployment the pod belongs to
 		deployments := appsv1.DeploymentList{}
-		if err := r.List(ctx, &deployments, &client.ListOptions{Namespace: req.Namespace}); err != nil {
+		if err := r.List(ctx, &deployments, &client.ListOptions{Namespace: req.Namespace}); err != nil && !apierrs.IsNotFound(err) {
 			l.Error(err, "unable to fetch Deployments")
-			return ctrl.Result{}, ignoreNotFound(err)
+			return ctrl.Result{}, err
 		}
 		for _, d := range deployments.Items {
 			matches := 0
@@ -133,9 +131,9 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 		// check what replicaset the pod belongs to
 		replicaSets := appsv1.ReplicaSetList{}
-		if err := r.List(ctx, &replicaSets, &client.ListOptions{Namespace: req.Namespace}); err != nil {
+		if err := r.List(ctx, &replicaSets, &client.ListOptions{Namespace: req.Namespace}); err != nil && !apierrs.IsNotFound(err) {
 			l.Error(err, "unable to fetch replicaSets")
-			return ctrl.Result{}, ignoreNotFound(err)
+			return ctrl.Result{}, err
 		}
 		for _, r := range replicaSets.Items {
 			matches := 0
@@ -159,9 +157,9 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 		// check what service the pod belongs to
 		services := corev1.ServiceList{}
-		if err := r.List(ctx, &services, &client.ListOptions{Namespace: req.Namespace}); err != nil {
+		if err := r.List(ctx, &services, &client.ListOptions{Namespace: req.Namespace}); err != nil && !apierrs.IsNotFound(err) {
 			l.Error(err, "unable to fetch services")
-			return ctrl.Result{}, ignoreNotFound(err)
+			return ctrl.Result{}, err
 		}
 		for _, s := range services.Items {
 			matches := 0
@@ -193,9 +191,9 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 		// check what pdb the pod belongs to
 		pdbs := policyv1beta1.PodDisruptionBudgetList{}
-		if err := r.List(ctx, &pdbs, &client.ListOptions{Namespace: req.Namespace}); err != nil {
+		if err := r.List(ctx, &pdbs, &client.ListOptions{Namespace: req.Namespace}); err != nil && !apierrs.IsNotFound(err) {
 			l.Error(err, "unable to fetch pdbs")
-			return ctrl.Result{}, ignoreNotFound(err)
+			return ctrl.Result{}, err
 		}
 		for _, pdb := range pdbs.Items {
 			matches := 0
@@ -219,9 +217,9 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 		// check if the pod's replicaset or deployment has hpa
 		hpas := autoscalingv1.HorizontalPodAutoscalerList{}
-		if err := r.List(ctx, &hpas, &client.ListOptions{Namespace: req.Namespace}); err != nil {
+		if err := r.List(ctx, &hpas, &client.ListOptions{Namespace: req.Namespace}); err != nil && !apierrs.IsNotFound(err) {
 			l.Error(err, "unable to fetch hpas")
-			return ctrl.Result{}, ignoreNotFound(err)
+			return ctrl.Result{}, err
 		}
 		for _, hpa := range hpas.Items {
 			if hpa.Spec.ScaleTargetRef.Kind == "Deployment" {
@@ -248,7 +246,7 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 }
 
 func (r *PodEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	l := r.Log.WithName("Setup")
+	l := r.Log
 	podInfos = map[string]*PodInfo{}
 	if err := mgr.GetFieldIndexer().IndexField(&corev1.Pod{}, ".metadata.name", func(rawObj runtime.Object) []string {
 		pod := rawObj.(*corev1.Pod)
@@ -257,21 +255,10 @@ func (r *PodEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}); err != nil {
 		return err
 	}
+	l.Info("init manager")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&watcherv1.PodEvaluator{}).
 		For(&corev1.Pod{}).
-		WithEventFilter(predicate.Funcs{
-			CreateFunc:  func(e event.CreateEvent) bool { return true },
-			DeleteFunc:  func(e event.DeleteEvent) bool { return false },
-			UpdateFunc:  func(e event.UpdateEvent) bool { return true },
-			GenericFunc: func(e event.GenericEvent) bool { return true },
-		}).
+		WithEventFilter(GetPredicateFuncs(l)).
 		Complete(r)
-}
-
-func ignoreNotFound(err error) error {
-	if apierrs.IsNotFound(err) {
-		return nil
-	}
-	return err
 }

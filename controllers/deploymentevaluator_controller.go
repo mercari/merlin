@@ -23,17 +23,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"time"
 )
 
 type DeploymentIssue = string
-
-const (
-	DeploymentEvaluatorAnnotationCheckedTime = "deploymentevaluator.watcher.merlin.mercari.com/checked-at"
-	DeploymentEvaluatorAnnotationIssue       = "deploymentevaluator.watcher.merlin.mercari.com/issue"
-)
 
 // DeploymentEvaluatorReconciler reconciles a DeploymentEvaluator object
 type DeploymentEvaluatorReconciler struct {
@@ -54,17 +47,6 @@ func (r *DeploymentEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		l.Error(err, "failed to get deployment")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	if lastChecked, ok := deployment.Annotations[DeploymentEvaluatorAnnotationCheckedTime]; ok {
-		lastCheckedTime, err := time.Parse(time.RFC3339, lastChecked)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-
-		if lastCheckedTime.Add(3 * time.Second).After(time.Now()) {
-			l.Info("last check within 3 sec, will skip")
-			return ctrl.Result{}, err
-		}
-	}
 
 	evaluator := watcherv1.DeploymentEvaluator{}
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.DeploymentEvaluatorMetadataName}, &evaluator); err != nil {
@@ -82,20 +64,16 @@ func (r *DeploymentEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	deployment.SetAnnotations(map[string]string{
-		DeploymentEvaluatorAnnotationCheckedTime: time.Now().Format(time.RFC3339),
-		DeploymentEvaluatorAnnotationIssue:       "",
-	})
-
 	evaluationResult := evaluator.Spec.Rules.Evaluate(ctx, req, r.Client, deployment)
 	if evaluationResult.Err != nil {
 		l.Error(evaluationResult.Err, "hit error with evaluation")
 		return ctrl.Result{}, evaluationResult.Err
 	}
-	if len(evaluationResult.Issues) > 0 {
-		l.Info("deployment has issues", "issues", evaluationResult.Issues, "deployment", deployment.Name)
-		deployment.Annotations[DeploymentEvaluatorAnnotationIssue] = evaluationResult.Issues.String()
-	}
+
+	deployment.SetAnnotations(map[string]string{
+		AnnotationCheckedTime: time.Now().Format(time.RFC3339),
+		AnnotationIssue:       evaluationResult.Issues.String(),
+	})
 
 	if err := r.Update(ctx, &deployment); err != nil {
 		l.Error(err, "unable to update deployment annotations")
@@ -106,7 +84,7 @@ func (r *DeploymentEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 }
 
 func (r *DeploymentEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	l := r.Log.WithName("Setup")
+	l := r.Log
 	if err := mgr.GetFieldIndexer().IndexField(&appsv1.Deployment{}, ".metadata.name", func(rawObj runtime.Object) []string {
 		deployment := rawObj.(*appsv1.Deployment)
 		l.Info("indexing", "deployment", deployment.Name)
@@ -114,14 +92,10 @@ func (r *DeploymentEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error
 	}); err != nil {
 		return err
 	}
+	l.Info("init manager")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&watcherv1.DeploymentEvaluator{}).
 		For(&appsv1.Deployment{}).
-		WithEventFilter(predicate.Funcs{
-			CreateFunc:  func(e event.CreateEvent) bool { return true },
-			DeleteFunc:  func(e event.DeleteEvent) bool { return false },
-			UpdateFunc:  func(e event.UpdateEvent) bool { return true },
-			GenericFunc: func(e event.GenericEvent) bool { return true },
-		}).
+		WithEventFilter(GetPredicateFuncs(l)).
 		Complete(r)
 }

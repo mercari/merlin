@@ -20,17 +20,11 @@ import (
 	"github.com/go-logr/logr"
 	watcherv1 "github.com/kouzoh/merlin/api/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"time"
-)
-
-const (
-	NamespaceEvaluatorAnnotationCheckedTime = "namespaceevaluator.watcher.merlin.mercari.com/checked-at"
-	NamespaceEvaluatorAnnotationIssue       = "namespaceevaluator.watcher.merlin.mercari.com/issue"
 )
 
 // NamespaceEvaluatorReconciler reconciles a NamespaceEvaluator object
@@ -48,21 +42,9 @@ func (r *NamespaceEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result,
 	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Name)
 
 	namespace := corev1.Namespace{}
-	if err := r.Get(ctx, client.ObjectKey{Name: req.Name}, &namespace); err != nil {
+	if err := r.Get(ctx, client.ObjectKey{Name: req.Name}, &namespace); err != nil && !apierrs.IsNotFound(err) {
 		l.Error(err, "unable to fetch namespace")
-		return ctrl.Result{}, ignoreNotFound(err)
-	}
-
-	if lastChecked, ok := namespace.Annotations[NamespaceEvaluatorAnnotationCheckedTime]; ok {
-		lastCheckedTime, err := time.Parse(time.RFC3339, lastChecked)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-
-		if lastCheckedTime.Add(3 * time.Second).After(time.Now()) {
-			l.Info("last check within 3 sec, will skip")
-			return ctrl.Result{}, err
-		}
+		return ctrl.Result{}, err
 	}
 
 	evaluator := watcherv1.NamespaceEvaluator{}
@@ -81,20 +63,16 @@ func (r *NamespaceEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result,
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	namespace.SetAnnotations(map[string]string{
-		NamespaceEvaluatorAnnotationCheckedTime: time.Now().Format(time.RFC3339),
-		NamespaceEvaluatorAnnotationIssue:       "",
-	})
-
 	evaluationResult := evaluator.Spec.Rules.Evaluate(ctx, req, r.Client, namespace)
 	if evaluationResult.Err != nil {
 		l.Error(evaluationResult.Err, "hit error with evaluation")
 		return ctrl.Result{}, evaluationResult.Err
 	}
-	if len(evaluationResult.Issues) > 0 {
-		l.Info("namespace has issues", "issues", evaluationResult.Issues, "namespace", namespace.Name)
-		namespace.Annotations[NamespaceEvaluatorAnnotationIssue] = evaluationResult.Issues.String()
-	}
+
+	namespace.SetAnnotations(map[string]string{
+		AnnotationCheckedTime: time.Now().Format(time.RFC3339),
+		AnnotationIssue:       evaluationResult.Issues.String(),
+	})
 
 	if err := r.Update(ctx, &namespace); err != nil {
 		l.Error(err, "unable to update namespace annotations")
@@ -104,23 +82,18 @@ func (r *NamespaceEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result,
 }
 
 func (r *NamespaceEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	l := r.Log.WithName("Setup")
+	l := r.Log
 	if err := mgr.GetFieldIndexer().IndexField(&corev1.Namespace{}, ".metadata.name", func(rawObj runtime.Object) []string {
 		namespace := rawObj.(*corev1.Namespace)
-		l.Info("index field", "namespace", namespace.Name)
+		l.Info("indexing", "namespace", namespace.Name)
 		return []string{namespace.Name}
 	}); err != nil {
 		return err
 	}
+	l.Info("init manager")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&watcherv1.NamespaceEvaluator{}).
 		For(&corev1.Namespace{}).
-		WithEventFilter(predicate.Funcs{
-			// While we do not care what the event contains, we should not handle Delete events or Unknown / Generic events
-			CreateFunc:  func(e event.CreateEvent) bool { return true },
-			DeleteFunc:  func(e event.DeleteEvent) bool { return false },
-			UpdateFunc:  func(e event.UpdateEvent) bool { return true },
-			GenericFunc: func(e event.GenericEvent) bool { return true },
-		}).
+		WithEventFilter(GetPredicateFuncs(l)).
 		Complete(r)
 }

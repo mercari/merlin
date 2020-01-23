@@ -20,16 +20,14 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	watcherv1 "github.com/kouzoh/merlin/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
-
-	watcherv1 "github.com/kouzoh/merlin/api/v1"
 )
 
 type PDBEvaluatorReconciler struct {
@@ -62,9 +60,9 @@ func (r *PDBEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	pdbs := policyv1beta1.PodDisruptionBudgetList{}
-	if err := r.List(ctx, &pdbs, &client.ListOptions{Namespace: req.Namespace}); err != nil {
+	if err := r.List(ctx, &pdbs, &client.ListOptions{Namespace: req.Namespace}); err != nil && !apierrs.IsNotFound(err) {
 		l.Error(err, "unable to fetch PDBs")
-		return ctrl.Result{}, ignoreNotFound(err)
+		return ctrl.Result{}, err
 	}
 	for _, pdb := range pdbs.Items {
 		pdbSelector := v1.SetAsLabelSelector(pdb.Spec.Selector.MatchLabels).String()
@@ -74,9 +72,9 @@ func (r *PDBEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 			Raw: &v1.ListOptions{
 				LabelSelector: pdbSelector,
 			},
-		}); err != nil {
+		}); err != nil && !apierrs.IsNotFound(err) {
 			l.Error(err, "unable to fetch Pods")
-			return ctrl.Result{}, ignoreNotFound(err)
+			return ctrl.Result{}, err
 		}
 		if len(pods.Items) == 0 {
 			msg := fmt.Sprintf("PDB `%s` has no target pods", pdb.Name)
@@ -90,23 +88,18 @@ func (r *PDBEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 }
 
 func (r *PDBEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	l := r.Log.WithName("Setup")
+	l := r.Log
 	if err := mgr.GetFieldIndexer().IndexField(&policyv1beta1.PodDisruptionBudget{}, ".metadata.name", func(rawObj runtime.Object) []string {
 		pdb := rawObj.(*policyv1beta1.PodDisruptionBudget)
-		l.Info("index field", "pdb", pdb.Name)
+		l.Info("indexing", "pdb", pdb.Name)
 		return []string{pdb.Name}
 	}); err != nil {
 		return err
 	}
+	l.Info("init manager")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&watcherv1.PDBEvaluator{}).
 		For(&policyv1beta1.PodDisruptionBudget{}).
-		WithEventFilter(predicate.Funcs{
-			// While we do not care what the event contains, we should not handle Delete events or Unknown / Generic events
-			CreateFunc:  func(e event.CreateEvent) bool { return true },
-			DeleteFunc:  func(e event.DeleteEvent) bool { return false },
-			UpdateFunc:  func(e event.UpdateEvent) bool { return true },
-			GenericFunc: func(e event.GenericEvent) bool { return true },
-		}).
+		WithEventFilter(GetPredicateFuncs(l)).
 		Complete(r)
 }
