@@ -39,6 +39,20 @@ spec:
               items:
                 type: string
               type: array
+            rules:
+              description: Rules are the rules to check for the evaluator
+              properties:
+                invalidMetrics:
+                  properties:
+                    enabled:
+                      type: boolean
+                  type: object
+                reachedMaxReplica:
+                  properties:
+                    enabled:
+                      type: boolean
+                  type: object
+              type: object
           type: object
         status:
           type: object

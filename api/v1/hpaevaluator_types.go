@@ -16,6 +16,7 @@ limitations under the License.
 package v1
 
 import (
+	"github.com/kouzoh/merlin/rules"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -26,6 +27,8 @@ const (
 type HPAEvaluatorSpec struct {
 	// IgnoreNamespaces is the list of namespaces (string) to ignore
 	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
+	//Rules are the rules to check for the evaluator
+	Rules rules.HPARules `json:"rules,omitempty"`
 }
 
 type HPAEvaluatorStatus struct {

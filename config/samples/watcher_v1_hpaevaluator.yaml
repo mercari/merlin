@@ -3,7 +3,6 @@ kind: HPAEvaluator
 metadata:
   name: hpa-evaluator
 spec:
-  # Add fields here
   ignoreNamespaces:
     - kube-system
     - isto-system
@@ -11,4 +10,10 @@ spec:
     - spinnaker
     - cert-manager
     - prometheus
+  rules:
+    reachedMaxReplica:
+      enabled: true
+    invalidMetrics:
+      enabled: true
+
 

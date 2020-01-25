@@ -19,6 +19,7 @@ import (
 	"context"
 	"github.com/go-logr/logr"
 	watcherv1 "github.com/kouzoh/merlin/api/v1"
+	"github.com/kouzoh/merlin/rules"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,12 +41,7 @@ type NamespaceEvaluatorReconciler struct {
 func (r *NamespaceEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Name)
-
-	namespace := corev1.Namespace{}
-	if err := r.Get(ctx, client.ObjectKey{Name: req.Name}, &namespace); err != nil && !apierrs.IsNotFound(err) {
-		l.Error(err, "unable to fetch namespace")
-		return ctrl.Result{}, err
-	}
+	l.Info("Starting reconcile")
 
 	evaluator := watcherv1.NamespaceEvaluator{}
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.NamespaceEvaluatorMetadataName}, &evaluator); err != nil {
@@ -63,7 +59,14 @@ func (r *NamespaceEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result,
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	evaluationResult := evaluator.Spec.Rules.Evaluate(ctx, req, r.Client, namespace)
+	namespace := corev1.Namespace{}
+	if err := r.Get(ctx, client.ObjectKey{Name: req.Name}, &namespace); err != nil && !apierrs.IsNotFound(err) {
+		l.Error(err, "unable to fetch namespace")
+		return ctrl.Result{}, err
+	}
+
+	var resourceRules rules.ResourceRules = evaluator.Spec.Rules
+	evaluationResult := resourceRules.EvaluateAll(ctx, req, r.Client, l, namespace)
 	if evaluationResult.Err != nil {
 		l.Error(evaluationResult.Err, "hit error with evaluation")
 		return ctrl.Result{}, evaluationResult.Err

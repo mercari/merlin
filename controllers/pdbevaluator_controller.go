@@ -43,6 +43,8 @@ type PDBEvaluatorReconciler struct {
 func (r *PDBEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Namespace)
+	l.Info("Starting reconcile")
+
 	evaluator := watcherv1.PDBEvaluator{}
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.PDBEvaluatorMetadataName}, &evaluator); err != nil {
 		l.Error(err, "failed to get evaluator")

@@ -3,15 +3,6 @@ kind: DeploymentEvaluator
 metadata:
   name: deployment-evaluator
 spec:
-  # Add fields here
-  rules:
-    canary:
-      description: ""
-      enabled: true
-    replica:
-      description: ""
-      min: 3
-      enabled: true
   ignoreNamespaces:
     - kube-system
     - isto-system
@@ -19,3 +10,9 @@ spec:
     - spinnaker
     - cert-manager
     - prometheus
+  rules:
+    hasCanary:
+      enabled: true
+    replica:
+      min: 3
+      enabled: true

@@ -19,6 +19,7 @@ import (
 	"context"
 	"github.com/go-logr/logr"
 	watcherv1 "github.com/kouzoh/merlin/api/v1"
+	"github.com/kouzoh/merlin/rules"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -42,11 +43,7 @@ type DeploymentEvaluatorReconciler struct {
 func (r *DeploymentEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Namespace, "deployment", req.Name)
-	deployment := appsv1.Deployment{}
-	if err := r.Client.Get(ctx, req.NamespacedName, &deployment); err != nil {
-		l.Error(err, "failed to get deployment")
-		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
+	l.Info("Starting reconcile")
 
 	evaluator := watcherv1.DeploymentEvaluator{}
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.DeploymentEvaluatorMetadataName}, &evaluator); err != nil {
@@ -64,12 +61,18 @@ func (r *DeploymentEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	evaluationResult := evaluator.Spec.Rules.Evaluate(ctx, req, r.Client, deployment)
+	deployment := appsv1.Deployment{}
+	if err := r.Client.Get(ctx, req.NamespacedName, &deployment); err != nil {
+		l.Error(err, "failed to get deployment")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	var resourceRules rules.ResourceRules = evaluator.Spec.Rules
+	evaluationResult := resourceRules.EvaluateAll(ctx, req, r.Client, l, deployment)
 	if evaluationResult.Err != nil {
 		l.Error(evaluationResult.Err, "hit error with evaluation")
 		return ctrl.Result{}, evaluationResult.Err
 	}
-
 	deployment.SetAnnotations(map[string]string{
 		AnnotationCheckedTime: time.Now().Format(time.RFC3339),
 		AnnotationIssue:       evaluationResult.Issues.String(),

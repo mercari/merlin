@@ -44,17 +44,13 @@ spec:
             rules:
               description: Rules are the rules to check for the evaluator
               properties:
-                canary:
+                hasCanary:
                   properties:
-                    description:
-                      type: string
                     enabled:
                       type: boolean
                   type: object
                 replica:
                   properties:
-                    description:
-                      type: string
                     enabled:
                       type: boolean
                     min:

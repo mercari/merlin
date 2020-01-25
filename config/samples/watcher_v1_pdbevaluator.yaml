@@ -3,7 +3,6 @@ kind: PDBEvaluator
 metadata:
   name: pdb-evaluator
 spec:
-  # Add fields here
   ignoreNamespaces:
     - kube-system
     - isto-system
@@ -11,4 +10,7 @@ spec:
     - spinnaker
     - cert-manager
     - prometheus
+  rules:
+    noMatchedPods:
+      enabled: true
 

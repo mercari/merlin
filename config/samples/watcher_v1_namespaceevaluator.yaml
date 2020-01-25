@@ -3,7 +3,6 @@ kind: NamespaceEvaluator
 metadata:
   name: namespace-evaluator
 spec:
-  # Add fields here
   ignoreNamespaces:
     - kube-system
     - isto-system

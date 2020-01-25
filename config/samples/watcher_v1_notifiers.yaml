@@ -3,7 +3,6 @@ kind: Notifiers
 metadata:
   name: notifiers
 spec:
-  # Add fields here
   slack:
     channel: "your_channel"
     webhook_url: "your_webhook_url"

@@ -1,21 +1,41 @@
 package rules
 
-import "strings"
+import (
+	"context"
+	"fmt"
+	"github.com/go-logr/logr"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strings"
+)
 
-type Rule struct {
-	Name    string `json:"name,omitempty"`
-	Enabled bool   `json:"enabled,omitempty"`
+type ResourceRules interface {
+	EvaluateAll(ctx context.Context, req ctrl.Request, cli client.Client, log logr.Logger, resource interface{}) *EvaluationResult
+}
+
+type Rule interface {
+	Evaluate(ctx context.Context, req ctrl.Request, cli client.Client, log logr.Logger, resource interface{}) *EvaluationResult
 }
 
 type Issues []string
+
+func (i Issues) String() string {
+	return strings.Join(i, ",")
+}
 
 type EvaluationResult struct {
 	Err    error
 	Issues Issues
 }
 
-func (i Issues) String() string {
-	return strings.Join(i, ",")
+func (e *EvaluationResult) Combine(a *EvaluationResult) *EvaluationResult {
+	if e.Err != nil && a.Err != nil {
+		e.Err = fmt.Errorf("%s, %s", e.Err.Error(), a.Err.Error())
+	}
+	for _, i := range a.Issues {
+		e.Issues = append(e.Issues, i)
+	}
+	return e
 }
 
 //

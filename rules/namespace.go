@@ -2,6 +2,7 @@ package rules
 
 import (
 	"context"
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -21,15 +22,20 @@ type NamespaceRules struct {
 	IstioInjection IstioInjection `json:"istioInjection,omitempty"`
 }
 
+func (r NamespaceRules) EvaluateAll(ctx context.Context, req ctrl.Request, cli client.Client, log logr.Logger, resource interface{}) *EvaluationResult {
+	namespace := resource.(corev1.Namespace)
+	evaluationResult := r.IstioInjection.Evaluate(ctx, req, cli, log, namespace)
+	return evaluationResult
+}
+
 type IstioInjection struct {
 	Label string `json:"label,omitempty"`
 }
 
-func (r NamespaceRules) Evaluate(ctx context.Context, req ctrl.Request, c client.Client, namespace corev1.Namespace) EvaluationResult {
-	var evaluationResult EvaluationResult
-
-	if r.IstioInjection.Label == LabelExists || r.IstioInjection.Label == LabelFalse || r.IstioInjection.Label == LabelTrue {
-		istioInjectionLabelExpected := strings.ToLower(r.IstioInjection.Label)
+func (r IstioInjection) Evaluate(ctx context.Context, req ctrl.Request, cli client.Client, log logr.Logger, namespace corev1.Namespace) *EvaluationResult {
+	evaluationResult := &EvaluationResult{}
+	if r.Label == LabelExists || r.Label == LabelFalse || r.Label == LabelTrue {
+		istioInjectionLabelExpected := strings.ToLower(r.Label)
 		istioInjectionLabel, ok := namespace.Labels[IstioInjectionLabelKey]
 		if !ok {
 			evaluationResult.Issues = append(evaluationResult.Issues, NamespaceIssueNoIstioInjectionLabel)
