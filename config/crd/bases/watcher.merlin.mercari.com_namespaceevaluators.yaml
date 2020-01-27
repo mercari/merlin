@@ -45,6 +45,8 @@ spec:
               properties:
                 istioInjection:
                   properties:
+                    enabled:
+                      type: boolean
                     label:
                       type: string
                   type: object

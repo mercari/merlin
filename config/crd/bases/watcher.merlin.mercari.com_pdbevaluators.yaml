@@ -39,6 +39,15 @@ spec:
               items:
                 type: string
               type: array
+            rules:
+              description: Rules is the list of checks to perform for the namespace
+              properties:
+                noMatchedPods:
+                  properties:
+                    enabled:
+                      type: boolean
+                  type: object
+              type: object
           type: object
         status:
           type: object

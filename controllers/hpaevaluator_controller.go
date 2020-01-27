@@ -40,7 +40,7 @@ type HPAEvaluatorReconciler struct {
 func (r *HPAEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Namespace, "HPA", req.Name)
-	l.Info("Starting reconcile")
+	l.Info("Reconciling")
 
 	evaluator := watcherv1.HPAEvaluator{}
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.HPAEvaluatorMetadataName}, &evaluator); err != nil {
@@ -71,13 +71,21 @@ func (r *HPAEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, evaluationResult.Err
 	}
 
-	hpa.SetAnnotations(map[string]string{
+	annotations := map[string]string{
 		AnnotationCheckedTime: time.Now().Format(time.RFC3339),
-		AnnotationIssue:       evaluationResult.Issues.String(),
-	})
-
+		AnnotationIssue:       evaluationResult.IssuesLabelsAsString(),
+	}
+	hpa.SetAnnotations(annotations)
 	if err := r.Update(ctx, &hpa); err != nil {
-		l.Error(err, "unable to update hpa annotations")
+		l.Error(err, "unable to update annotations")
+	}
+
+	if annotations[AnnotationIssue] != "" {
+		msg := evaluationResult.IssueMessagesAsString()
+		l.Info(msg)
+		if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
+			l.Error(err, "Failed to send message to slack", "msg", msg)
+		}
 	}
 
 	return ctrl.Result{}, nil

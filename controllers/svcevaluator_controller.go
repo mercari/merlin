@@ -45,7 +45,7 @@ type SVCEvaluatorReconciler struct {
 func (r *SVCEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Namespace, "SVC Name", req.Name)
-	l.Info("Starting reconcile")
+	l.Info("Reconciling")
 
 	evaluator := watcherv1.SVCEvaluator{}
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.SVCEvaluatorMetadataName}, &evaluator); err != nil {

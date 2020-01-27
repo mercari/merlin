@@ -17,14 +17,13 @@ package controllers
 
 import (
 	"context"
-	"fmt"
+	"github.com/kouzoh/merlin/rules"
+	"time"
 
 	"github.com/go-logr/logr"
 	watcherv1 "github.com/kouzoh/merlin/api/v1"
-	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -43,7 +42,7 @@ type PDBEvaluatorReconciler struct {
 func (r *PDBEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Namespace)
-	l.Info("Starting reconcile")
+	l.Info("Reconciling")
 
 	evaluator := watcherv1.PDBEvaluator{}
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: watcherv1.PDBEvaluatorMetadataName}, &evaluator); err != nil {
@@ -61,29 +60,32 @@ func (r *PDBEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	pdbs := policyv1beta1.PodDisruptionBudgetList{}
-	if err := r.List(ctx, &pdbs, &client.ListOptions{Namespace: req.Namespace}); err != nil && !apierrs.IsNotFound(err) {
+	pdb := policyv1beta1.PodDisruptionBudget{}
+	if err := r.Get(ctx, client.ObjectKey{Name: req.Name}, &pdb); err != nil && !apierrs.IsNotFound(err) {
 		l.Error(err, "unable to fetch PDBs")
 		return ctrl.Result{}, err
 	}
-	for _, pdb := range pdbs.Items {
-		pdbSelector := v1.SetAsLabelSelector(pdb.Spec.Selector.MatchLabels).String()
-		pods := corev1.PodList{}
-		if err := r.List(ctx, &pods, &client.ListOptions{
-			Namespace: req.Namespace,
-			Raw: &v1.ListOptions{
-				LabelSelector: pdbSelector,
-			},
-		}); err != nil && !apierrs.IsNotFound(err) {
-			l.Error(err, "unable to fetch Pods")
-			return ctrl.Result{}, err
-		}
-		if len(pods.Items) == 0 {
-			msg := fmt.Sprintf("PDB `%s` has no target pods", pdb.Name)
-			l.Info(msg)
-			if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
-				l.Error(err, "Failed to send message to slack")
-			}
+	var resourceRules rules.ResourceRules = evaluator.Spec.Rules
+	evaluationResult := resourceRules.EvaluateAll(ctx, req, r.Client, l, pdb)
+	if evaluationResult.Err != nil {
+		l.Error(evaluationResult.Err, "hit error with evaluation")
+		return ctrl.Result{}, evaluationResult.Err
+	}
+
+	annotations := map[string]string{
+		AnnotationCheckedTime: time.Now().Format(time.RFC3339),
+		AnnotationIssue:       evaluationResult.IssuesLabelsAsString(),
+	}
+	pdb.SetAnnotations(annotations)
+	if err := r.Update(ctx, &pdb); err != nil {
+		l.Error(err, "unable to update annotations")
+	}
+
+	if annotations[AnnotationIssue] != "" {
+		msg := evaluationResult.IssueMessagesAsString()
+		l.Info(msg)
+		if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
+			l.Error(err, "Failed to send message to slack", "msg", msg)
 		}
 	}
 	return ctrl.Result{}, nil

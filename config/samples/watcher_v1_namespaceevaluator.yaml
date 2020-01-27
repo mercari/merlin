@@ -12,4 +12,5 @@ spec:
     - prometheus
   rules:
     istioInjection:
+      enabled: true
       label: "exists"

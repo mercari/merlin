@@ -4,7 +4,7 @@ metadata:
   name: svc-evaluator
 spec:
   ignoreNamespaces:
-  - kube-system
-  - isto-system
-  - cert-manager
-  - prometheus
+    - kube-system
+    - isto-system
+    - cert-manager
+    - prometheus

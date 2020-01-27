@@ -4,5 +4,6 @@ metadata:
   name: notifiers
 spec:
   slack:
+    severity: "warning"
     channel: "your_channel"
     webhook_url: "your_webhook_url"

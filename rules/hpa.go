@@ -2,6 +2,7 @@ package rules
 
 import (
 	"context"
+	"fmt"
 	"github.com/go-logr/logr"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -15,10 +16,14 @@ type HPARules struct {
 
 func (r HPARules) EvaluateAll(ctx context.Context, req ctrl.Request, cli client.Client, log logr.Logger, resource interface{}) *EvaluationResult {
 	evaluationResult := &EvaluationResult{}
-	hpa := resource.(autoscalingv1.HorizontalPodAutoscaler)
+	hpa, ok := resource.(autoscalingv1.HorizontalPodAutoscaler)
+	if !ok {
+		evaluationResult.Err = fmt.Errorf("unable to convert resource to hpa type")
+		return evaluationResult
+	}
 	evaluationResult.
-		Combine(r.ReachedMaxReplica.Evaluate(ctx, req, cli, log, hpa).
-			Combine(r.InvalidMetrics.Evaluate(ctx, req, cli, log, hpa)))
+		Combine(r.ReachedMaxReplica.Evaluate(ctx, req, cli, log, hpa)).
+		Combine(r.InvalidMetrics.Evaluate(ctx, req, cli, log, hpa))
 	return evaluationResult
 }
 
@@ -28,10 +33,15 @@ type ReachedMaxReplica struct {
 
 func (r ReachedMaxReplica) Evaluate(ctx context.Context, req ctrl.Request, cli client.Client, log logr.Logger, hpa autoscalingv1.HorizontalPodAutoscaler) *EvaluationResult {
 	evaluationResult := &EvaluationResult{}
-	if r.Enabled {
-		if hpa.Spec.MaxReplicas == hpa.Status.CurrentReplicas {
-			evaluationResult.Issues = append(evaluationResult.Issues, "HPA reached its max replicas")
-		}
+	if !r.Enabled {
+		return evaluationResult
+	}
+	if hpa.Spec.MaxReplicas == hpa.Status.CurrentReplicas {
+		evaluationResult.Issues = append(evaluationResult.Issues, Issue{
+			Severity: IssueSeverityWarning,
+			Label:    IssueLabelReachedMaxReplica,
+			Message:  fmt.Sprintf("HPA `%s` reached its max replicas in namespace `%s`", hpa.Name, hpa.Namespace),
+		})
 	}
 	return evaluationResult
 }
@@ -42,10 +52,15 @@ type InvalidMetrics struct {
 
 func (r InvalidMetrics) Evaluate(ctx context.Context, req ctrl.Request, cli client.Client, log logr.Logger, hpa autoscalingv1.HorizontalPodAutoscaler) *EvaluationResult {
 	evaluationResult := &EvaluationResult{}
-	if r.Enabled {
-		if hpa.Status.CurrentCPUUtilizationPercentage == nil {
-			evaluationResult.Issues = append(evaluationResult.Issues, "HPA config is not setup properly")
-		}
+	if !r.Enabled {
+		return evaluationResult
+	}
+	if hpa.Status.CurrentCPUUtilizationPercentage == nil {
+		evaluationResult.Issues = append(evaluationResult.Issues, Issue{
+			Severity: IssueSeverityCritical,
+			Label:    IssueLabelInvalidSetting,
+			Message:  fmt.Sprintf("HPA `%s` config is not setup properly in namespace `%s`", hpa.Name, hpa.Namespace),
+		})
 	}
 	return evaluationResult
 }
