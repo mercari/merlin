@@ -10,4 +10,13 @@ spec:
     - spinnaker
     - cert-manager
     - prometheus
-  restarts: 10
+  rules:
+    restarts:
+      enabled: true
+      threshold: 10
+    ownedByReplicaset:
+      enabled: true
+    belongsToService:
+      enabled: true
+    managedByPDB:
+      enabled: true

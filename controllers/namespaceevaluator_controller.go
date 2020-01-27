@@ -62,7 +62,7 @@ func (r *NamespaceEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result,
 	namespace := corev1.Namespace{}
 	if err := r.Get(ctx, req.NamespacedName, &namespace); err != nil && !apierrs.IsNotFound(err) {
 		l.Error(err, "unable to fetch namespace")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	var resourceRules rules.ResourceRules = evaluator.Spec.Rules

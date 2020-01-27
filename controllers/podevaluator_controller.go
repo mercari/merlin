@@ -17,17 +17,14 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"github.com/go-logr/logr"
-	appsv1 "k8s.io/api/apps/v1"
-	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	"github.com/kouzoh/merlin/rules"
 	corev1 "k8s.io/api/core/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
+	"time"
 
 	watcherv1 "github.com/kouzoh/merlin/api/v1"
 )
@@ -84,166 +81,48 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	pods := corev1.PodList{}
-	if err := r.List(ctx, &pods, &client.ListOptions{Namespace: req.Namespace}); err != nil && !apierrs.IsNotFound(err) {
+	pod := corev1.Pod{}
+	if err := r.Get(ctx, req.NamespacedName, &pod); err != nil {
 		l.Error(err, "unable to fetch Pods")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	podNameSlice := strings.Split(pod.Name, "-")
+	podBaseName := strings.Join(podNameSlice[:len(podNameSlice)-1], "-")
+	if _, ok := podInfos[podBaseName]; ok {
+		// same type of pod already exists in the map, no need to proceed the following checks
+		l.Info("Skip some checks for same set of pods", "pod", req.Name, "basename", podBaseName)
+		return ctrl.Result{}, nil
 	}
 
-	for _, p := range pods.Items {
-		// check if pod has too many restarts and not running
-		for _, containerStatus := range p.Status.ContainerStatuses {
-			if containerStatus.RestartCount > evaluator.Spec.Restarts && p.Status.Phase != corev1.PodRunning {
-				msg := fmt.Sprintf("Pod `%s` has too many restarts and it's not running", req.NamespacedName)
-				l.Info(msg, "pod", req.Name, "restart limit", evaluator.Spec.Restarts)
-				if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
-					l.Error(err, "Failed to send message to slack")
-				}
-			}
-		}
+	info := PodInfo{Name: podBaseName}
+	podInfos[podBaseName] = &info
 
-		// below are checks only needed for one pod from the same sets of pods
-		podNameSlice := strings.Split(p.Name, "-")
-		podBaseName := strings.Join(podNameSlice[:len(podNameSlice)-1], "-")
-		if _, ok := podInfos[podBaseName]; ok {
-			// same type of pod already exists in the map, no need to proceed the following checks
-			l.Info("Skip some checks for same set of pods", "pod", req.Name, "basename", podBaseName)
-			continue
-		}
-		info := PodInfo{Name: podBaseName}
-		podInfos[podBaseName] = &info
-
-		// check what deployment the pod belongs to
-		deployments := appsv1.DeploymentList{}
-		if err := r.List(ctx, &deployments, &client.ListOptions{Namespace: req.Namespace}); err != nil && !apierrs.IsNotFound(err) {
-			l.Error(err, "unable to fetch Deployments")
-			return ctrl.Result{}, err
-		}
-		for _, d := range deployments.Items {
-			matches := 0
-			for k, v := range d.Spec.Selector.MatchLabels {
-				if _, ok := p.GetObjectMeta().GetLabels()[k]; ok && v == p.GetObjectMeta().GetLabels()[k] {
-					matches += 1
-				}
-			}
-			if matches == len(d.Spec.Selector.MatchLabels) {
-				info.Deployment = d.Name
-			}
-		}
-
-		// check what replicaset the pod belongs to
-		replicaSets := appsv1.ReplicaSetList{}
-		if err := r.List(ctx, &replicaSets, &client.ListOptions{Namespace: req.Namespace}); err != nil && !apierrs.IsNotFound(err) {
-			l.Error(err, "unable to fetch replicaSets")
-			return ctrl.Result{}, err
-		}
-		for _, r := range replicaSets.Items {
-			matches := 0
-			for k, v := range r.Spec.Selector.MatchLabels {
-				if _, ok := p.GetObjectMeta().GetLabels()[k]; ok && v == p.GetObjectMeta().GetLabels()[k] {
-					matches += 1
-				}
-			}
-			if matches == len(r.Spec.Selector.MatchLabels) {
-				info.ReplicaSet = r.Name
-			}
-		}
-
-		if info.Deployment == "" && info.ReplicaSet == "" {
-			msg := fmt.Sprintf("Pod `%s` is not managed by a deployment or replicaset", req.NamespacedName)
-			l.Info(msg, "pod", req.Name)
-			if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
-				l.Error(err, "Failed to send message to slack")
-			}
-		}
-
-		// check what service the pod belongs to
-		services := corev1.ServiceList{}
-		if err := r.List(ctx, &services, &client.ListOptions{Namespace: req.Namespace}); err != nil && !apierrs.IsNotFound(err) {
-			l.Error(err, "unable to fetch services")
-			return ctrl.Result{}, err
-		}
-		for _, s := range services.Items {
-			matches := 0
-			for k, v := range s.Spec.Selector {
-				if _, ok := p.GetObjectMeta().GetLabels()[k]; ok && v == p.GetObjectMeta().GetLabels()[k] {
-					matches += 1
-				}
-			}
-			if matches == len(s.Spec.Selector) {
-				info.Service = s.Name
-			}
-		}
-
-		if info.Service == "" {
-			isJob := false
-			for _, o := range p.OwnerReferences {
-				if o.Kind == "Job" {
-					isJob = true
-				}
-			}
-			if !isJob {
-				msg := fmt.Sprintf("Pod `%s` is not used by a service", req.NamespacedName)
-				l.Info(msg, "pod", req.Name)
-				if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
-					l.Error(err, "Failed to send message to slack")
-				}
-			}
-		}
-
-		// check what pdb the pod belongs to
-		pdbs := policyv1beta1.PodDisruptionBudgetList{}
-		if err := r.List(ctx, &pdbs, &client.ListOptions{Namespace: req.Namespace}); err != nil && !apierrs.IsNotFound(err) {
-			l.Error(err, "unable to fetch pdbs")
-			return ctrl.Result{}, err
-		}
-		for _, pdb := range pdbs.Items {
-			matches := 0
-			for k, v := range pdb.Spec.Selector.MatchLabels {
-				if _, ok := p.GetObjectMeta().GetLabels()[k]; ok && v == p.GetObjectMeta().GetLabels()[k] {
-					matches += 1
-				}
-			}
-			l.Info("pdb", "pdb", pdb.Name)
-			if matches == len(pdb.Spec.Selector.MatchLabels) {
-				info.PDB = pdb.Name
-			}
-		}
-		if info.PDB == "" {
-			msg := fmt.Sprintf("Pod `%s` is not managed by PDB", req.NamespacedName)
-			l.Info(msg, "pod", req.Name)
-			if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
-				l.Error(err, "Failed to send message to slack")
-			}
-		}
-
-		// check if the pod's replicaset or deployment has hpa
-		hpas := autoscalingv1.HorizontalPodAutoscalerList{}
-		if err := r.List(ctx, &hpas, &client.ListOptions{Namespace: req.Namespace}); err != nil && !apierrs.IsNotFound(err) {
-			l.Error(err, "unable to fetch hpas")
-			return ctrl.Result{}, err
-		}
-		for _, hpa := range hpas.Items {
-			if hpa.Spec.ScaleTargetRef.Kind == "Deployment" {
-				if info.Deployment == hpa.Spec.ScaleTargetRef.Name {
-					info.HPA = hpa.Name
-				}
-			} else if hpa.Spec.ScaleTargetRef.Kind == "ReplicaSet" {
-				if info.ReplicaSet == hpa.Spec.ScaleTargetRef.Name {
-					info.HPA = hpa.Name
-				}
-			}
-		}
-		if info.HPA == "" {
-			msg := fmt.Sprintf("Pod `%s` is not managed by HPA", req.NamespacedName)
-			l.Info(msg, "pod", req.Name)
-			if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
-				l.Error(err, "Failed to send message to slack")
-			}
-		}
-
+	var resourceRules rules.ResourceRules = evaluator.Spec.Rules
+	evaluationResult := resourceRules.EvaluateAll(ctx, req, r.Client, l, pod)
+	if evaluationResult.Err != nil {
+		l.Error(evaluationResult.Err, "hit error with evaluation")
+		return ctrl.Result{}, evaluationResult.Err
 	}
 
+	annotations := map[string]string{
+		AnnotationCheckedTime: time.Now().Format(time.RFC3339),
+		AnnotationIssue:       evaluationResult.IssuesLabelsAsString(),
+	}
+	pod.SetAnnotations(annotations)
+	if err := r.Update(ctx, &pod); err != nil {
+		l.Error(err, "unable to update annotations")
+	}
+
+	if annotations[AnnotationIssue] != "" {
+		msg := evaluationResult.IssueMessagesAsString()
+		l.Info(msg)
+		if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
+			l.Error(err, "Failed to send message to slack", "msg", msg)
+		}
+	}
+
+	// reset the map
+	podInfos = map[string]*PodInfo{}
 	return ctrl.Result{}, nil
 }
 

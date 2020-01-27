@@ -16,6 +16,7 @@ limitations under the License.
 package v1
 
 import (
+	"github.com/kouzoh/merlin/rules"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -31,6 +32,8 @@ type PodEvaluatorSpec struct {
 	Restarts int32 `json:"crashes,omitempty"`
 	// IgnoreNamespaces is the list of namespaces (string) to ignore
 	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
+	// Rules is the list of checks to perform for the namespace
+	Rules rules.PodRules `json:"rules,omitempty"`
 }
 
 // PodEvaluatorStatus defines the observed state of PodEvaluator

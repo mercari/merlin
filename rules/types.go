@@ -35,10 +35,15 @@ const (
 	IssueLabelNoIstioInjectionLabel              IssueLabel = "no_istio_injection_label"
 	IssueLabelUnexpectedIstioInjectionLabelValue IssueLabel = "unexpected_istio_injection_label_value"
 	IssueLabelNoMatchedPods                      IssueLabel = "no_matched_pods"
+	IssueLabelTooManyRestarts                    IssueLabel = "too_many_restarts"
+	IssueLabelNotOwnedByReplicaset               IssueLabel = "not_owned_by_replicaset"
+	IssueLabelNotBelongToService                 IssueLabel = "not_belonged_to_service"
+	IssueLabelNotManagedByPDB                    IssueLabel = "not_managed_by_pdb"
 )
 
 // Issue is the problem found by the rules
 type Issue struct {
+	// TODO: customizable severity
 	Severity IssueSeverity
 	Label    IssueLabel
 	Message  string
