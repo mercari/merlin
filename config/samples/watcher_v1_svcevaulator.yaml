@@ -8,3 +8,6 @@ spec:
     - isto-system
     - cert-manager
     - prometheus
+  rules:
+    noMatchedPods:
+      enabled: true

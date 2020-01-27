@@ -13,7 +13,7 @@ import (
 )
 
 type PDBRules struct {
-	NoMatchedPods NoMatchedPods `json:"noMatchedPods,omitempty"`
+	NoMatchedPods PDBNoMatchedPods `json:"noMatchedPods,omitempty"`
 }
 
 func (r PDBRules) EvaluateAll(ctx context.Context, req ctrl.Request, cli client.Client, log logr.Logger, resource interface{}) *EvaluationResult {
@@ -27,11 +27,11 @@ func (r PDBRules) EvaluateAll(ctx context.Context, req ctrl.Request, cli client.
 	return evaluationResult
 }
 
-type NoMatchedPods struct {
+type PDBNoMatchedPods struct {
 	Enabled bool `json:"enabled,omitempty"`
 }
 
-func (r NoMatchedPods) Evaluate(ctx context.Context, req ctrl.Request, cli client.Client, log logr.Logger, pdb policyv1beta1.PodDisruptionBudget) *EvaluationResult {
+func (r PDBNoMatchedPods) Evaluate(ctx context.Context, req ctrl.Request, cli client.Client, log logr.Logger, pdb policyv1beta1.PodDisruptionBudget) *EvaluationResult {
 	evaluationResult := &EvaluationResult{}
 	if !r.Enabled {
 		return evaluationResult

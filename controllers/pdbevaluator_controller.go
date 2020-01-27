@@ -61,7 +61,7 @@ func (r *PDBEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	pdb := policyv1beta1.PodDisruptionBudget{}
-	if err := r.Get(ctx, client.ObjectKey{Name: req.Name}, &pdb); err != nil && !apierrs.IsNotFound(err) {
+	if err := r.Get(ctx, req.NamespacedName, &pdb); err != nil && !apierrs.IsNotFound(err) {
 		l.Error(err, "unable to fetch PDBs")
 		return ctrl.Result{}, err
 	}

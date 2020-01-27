@@ -17,15 +17,13 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"github.com/go-logr/logr"
+	"github.com/kouzoh/merlin/rules"
 	corev1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"time"
 
 	watcherv1 "github.com/kouzoh/merlin/api/v1"
 )
@@ -44,7 +42,7 @@ type SVCEvaluatorReconciler struct {
 
 func (r *SVCEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Namespace, "SVC Name", req.Name)
+	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Namespace, "service", req.Name)
 	l.Info("Reconciling")
 
 	evaluator := watcherv1.SVCEvaluator{}
@@ -59,29 +57,35 @@ func (r *SVCEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	svcs := corev1.ServiceList{}
-	if err := r.List(ctx, &svcs, &client.ListOptions{Namespace: req.Namespace}); err != nil && !apierrs.IsNotFound(err) {
-		l.Error(err, "unable to fetch Services")
-		return ctrl.Result{}, err
+	svc := corev1.Service{}
+	if err := r.Get(ctx, req.NamespacedName, &svc); err != nil {
+		l.Error(err, "unable to fetch Service")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	var resourceRules rules.ResourceRules = evaluator.Spec.Rules
+	evaluationResult := resourceRules.EvaluateAll(ctx, req, r.Client, l, svc)
+	if evaluationResult.Err != nil {
+		l.Error(evaluationResult.Err, "hit error with evaluation")
+		return ctrl.Result{}, evaluationResult.Err
 	}
 
-	for _, svc := range svcs.Items {
-		lSelector, _ := v1.LabelSelectorAsSelector(v1.SetAsLabelSelector(labels.Set(svc.Spec.Selector)))
-		pods := corev1.PodList{}
-		if err := r.List(ctx, &pods, &client.ListOptions{
-			Namespace:     req.Namespace,
-			LabelSelector: lSelector,
-		}); err != nil {
-			l.Error(err, "unable to fetch pods")
-		}
-		if len(pods.Items) == 0 {
-			msg := fmt.Sprintf("Service `%s` in `%s` namespace has no pods matched", svc.Name, svc.Namespace)
-			l.Info(msg, "namespace", req.Namespace, "svc", svc.Name)
-			if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
-				l.Error(err, "Failed to send message to slack")
-			}
+	annotations := map[string]string{
+		AnnotationCheckedTime: time.Now().Format(time.RFC3339),
+		AnnotationIssue:       evaluationResult.IssuesLabelsAsString(),
+	}
+	svc.SetAnnotations(annotations)
+	if err := r.Update(ctx, &svc); err != nil {
+		l.Error(err, "unable to update annotations")
+	}
+
+	if annotations[AnnotationIssue] != "" {
+		msg := evaluationResult.IssueMessagesAsString()
+		l.Info(msg)
+		if err := notifiers.Spec.Slack.SendMessage(msg); err != nil {
+			l.Error(err, "Failed to send message to slack", "msg", msg)
 		}
 	}
+
 	return ctrl.Result{}, nil
 }
 

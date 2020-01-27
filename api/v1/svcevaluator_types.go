@@ -16,6 +16,7 @@ limitations under the License.
 package v1
 
 import (
+	"github.com/kouzoh/merlin/rules"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -26,6 +27,8 @@ const (
 type SVCEvaluatorSpec struct {
 	// IgnoreNamespaces is the list of namespaces (string) to ignore
 	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
+	// Rules is the list of checks to perform for the namespace
+	Rules rules.ServiceRules `json:"rules,omitempty"`
 }
 
 type SVCEvaluatorStatus struct {
