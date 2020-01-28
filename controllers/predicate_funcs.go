@@ -28,13 +28,16 @@ func (f EventFilter) DeleteEventFilter(e event.DeleteEvent) bool {
 }
 
 func (f EventFilter) UpdateEventFilter(e event.UpdateEvent) bool {
+	if e.MetaOld.GetAnnotations()[AnnotationCheckedTime] != e.MetaNew.GetAnnotations()[AnnotationCheckedTime] {
+		return false // annotation change, no need to process again.
+	}
 	if lastChecked, ok := e.MetaNew.GetAnnotations()[AnnotationCheckedTime]; ok {
 		lastCheckedTime, err := time.Parse(time.RFC3339, lastChecked)
 		if err != nil {
 			return true
 		}
 
-		return lastCheckedTime.Add(3 * time.Second).Before(time.Now())
+		return lastCheckedTime.Add(10 * time.Second).Before(time.Now())
 	}
 	return true
 }
@@ -45,7 +48,7 @@ func (f EventFilter) GenericEventFilter(e event.GenericEvent) bool {
 		if err != nil {
 			return true
 		}
-		return lastCheckedTime.Add(3 * time.Second).After(time.Now())
+		return lastCheckedTime.Add(10 * time.Second).Before(time.Now())
 	}
 	return true
 }

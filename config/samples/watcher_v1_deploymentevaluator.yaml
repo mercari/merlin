@@ -12,7 +12,7 @@ spec:
     - prometheus
   rules:
     hasCanary:
-      enabled: true
+      enabled: false
     replica:
       min: 3
       enabled: true

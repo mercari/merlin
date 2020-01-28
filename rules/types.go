@@ -64,18 +64,18 @@ type EvaluationResult struct {
 
 func (e *EvaluationResult) IssueMessagesAsString() string {
 	messages := make([]string, len(e.Issues))
-	for _, issue := range e.Issues {
-		messages = append(messages, issue.Message)
+	for i, issue := range e.Issues {
+		messages[i] = issue.Message
 	}
-	return strings.Join(messages, ";")
+	return strings.Join(messages, " \n")
 }
 
 func (e *EvaluationResult) IssuesLabelsAsString() string {
 	issues := make([]string, len(e.Issues))
-	for _, issue := range e.Issues {
-		issues = append(issues, issue.String())
+	for i, issue := range e.Issues {
+		issues[i] = string(issue.Label)
 	}
-	return strings.Join(issues, ";")
+	return strings.Join(issues, "; ")
 }
 
 func (e *EvaluationResult) Combine(a *EvaluationResult) *EvaluationResult {
