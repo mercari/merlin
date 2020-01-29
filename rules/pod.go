@@ -82,7 +82,7 @@ type OwnedByReplicaset struct {
 
 func (r OwnedByReplicaset) Evaluate(ctx context.Context, req ctrl.Request, cli client.Client, log logr.Logger, pod corev1.Pod) *EvaluationResult {
 	evaluationResult := &EvaluationResult{}
-	if !r.Enabled {
+	if !r.Enabled || IsPodAJob(pod) {
 		return evaluationResult
 	}
 	// check what replicaset the pod belongs to
@@ -119,7 +119,7 @@ type BelongsToService struct {
 
 func (r BelongsToService) Evaluate(ctx context.Context, req ctrl.Request, cli client.Client, log logr.Logger, pod corev1.Pod) *EvaluationResult {
 	evaluationResult := &EvaluationResult{}
-	if !r.Enabled {
+	if !r.Enabled || IsPodAJob(pod) {
 		return evaluationResult
 	}
 	// check what service the pod belongs to
@@ -141,9 +141,6 @@ func (r BelongsToService) Evaluate(ctx context.Context, req ctrl.Request, cli cl
 	}
 
 	if belongedService == "" {
-		if IsPodAJob(pod) {
-			return evaluationResult
-		}
 		evaluationResult.Issues = append(evaluationResult.Issues, Issue{
 			Severity: IssueSeverityWarning,
 			Label:    IssueLabelNotBelongToService,
@@ -159,7 +156,7 @@ type ManagedByPDB struct {
 
 func (r ManagedByPDB) Evaluate(ctx context.Context, req ctrl.Request, cli client.Client, log logr.Logger, pod corev1.Pod) *EvaluationResult {
 	evaluationResult := &EvaluationResult{}
-	if !r.Enabled {
+	if !r.Enabled || IsPodAJob(pod) {
 		return evaluationResult
 	}
 	// check what pdb the pod belongs to
