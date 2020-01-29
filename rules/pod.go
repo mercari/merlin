@@ -13,10 +13,26 @@ import (
 )
 
 type PodRules struct {
-	Restarts          PodRestarts       `json:"restarts,omitempty"`
-	OwnedByReplicaset OwnedByReplicaset `json:"managedByReplicaset,omitempty"`
-	BelongsToService  BelongsToService  `json:"belongsToService,omitempty"`
-	ManagedByPDB      ManagedByPDB      `json:"managedByPDB,omitempty"`
+	Restarts            PodRestarts          `json:"restarts,omitempty"`
+	OwnedByReplicaset   OwnedByReplicaset    `json:"managedByReplicaset,omitempty"`
+	BelongsToService    BelongsToService     `json:"belongsToService,omitempty"`
+	ManagedByPDB        ManagedByPDB         `json:"managedByPDB,omitempty"`
+	RequiredAnnotations []RequiredAnnotation `json:"requiredAnnotations,omitempty"`
+}
+
+// DeepCopyInto is the workaround for similar issue https://github.com/kubernetes/code-generator/issues/52
+// the controller-gen cant generate list/map
+func (r *PodRules) DeepCopyInto(out *PodRules) {
+	*out = *r
+	if len(r.RequiredAnnotations) > 0 {
+		i, o := &r.RequiredAnnotations, &out.RequiredAnnotations
+		*o = make([]RequiredAnnotation, len(*i))
+		copy(*o, *i)
+	}
+	out.Restarts = r.Restarts
+	out.OwnedByReplicaset = r.OwnedByReplicaset
+	out.BelongsToService = r.BelongsToService
+	out.ManagedByPDB = r.ManagedByPDB
 }
 
 func (r PodRules) EvaluateAll(ctx context.Context, req ctrl.Request, cli client.Client, log logr.Logger, resource interface{}) *EvaluationResult {
@@ -32,6 +48,9 @@ func (r PodRules) EvaluateAll(ctx context.Context, req ctrl.Request, cli client.
 		Combine(r.BelongsToService.Evaluate(ctx, req, cli, log, pod)).
 		Combine(r.ManagedByPDB.Evaluate(ctx, req, cli, log, pod))
 
+	for _, a := range r.RequiredAnnotations {
+		evaluationResult.Combine(a.Evaluate(ctx, req, cli, log, pod))
+	}
 	return evaluationResult
 }
 
@@ -122,19 +141,14 @@ func (r BelongsToService) Evaluate(ctx context.Context, req ctrl.Request, cli cl
 	}
 
 	if belongedService == "" {
-		isJob := false
-		for _, o := range pod.OwnerReferences {
-			if o.Kind == "Job" {
-				isJob = true
-			}
+		if IsPodAJob(pod) {
+			return evaluationResult
 		}
-		if !isJob {
-			evaluationResult.Issues = append(evaluationResult.Issues, Issue{
-				Severity: IssueSeverityWarning,
-				Label:    IssueLabelNotBelongToService,
-				Message:  fmt.Sprintf("Pod `%s` doesnt belong to any service", req.NamespacedName),
-			})
-		}
+		evaluationResult.Issues = append(evaluationResult.Issues, Issue{
+			Severity: IssueSeverityWarning,
+			Label:    IssueLabelNotBelongToService,
+			Message:  fmt.Sprintf("Pod `%s` doesnt belong to any service", req.NamespacedName),
+		})
 	}
 	return evaluationResult
 }
@@ -173,4 +187,45 @@ func (r ManagedByPDB) Evaluate(ctx context.Context, req ctrl.Request, cli client
 		})
 	}
 	return evaluationResult
+}
+
+type RequiredAnnotation struct {
+	Enabled bool   `json:"enabled,omitempty"`
+	Key     string `json:"key,omitempty"`
+	Value   string `json:"value,omitempty"`
+	// TODO: add regex checks?
+}
+
+func (r RequiredAnnotation) Evaluate(ctx context.Context, req ctrl.Request, cli client.Client, log logr.Logger, pod corev1.Pod) *EvaluationResult {
+	evaluationResult := &EvaluationResult{}
+	if !r.Enabled || IsPodAJob(pod) {
+		return evaluationResult
+	}
+	podAnnotations := pod.GetAnnotations()
+	if v, ok := podAnnotations[r.Key]; !ok {
+		evaluationResult.Issues = append(evaluationResult.Issues, Issue{
+			Severity: IssueSeverityInfo,
+			Label:    IssueLabel(fmt.Sprintf(string(IssueLabelMissingAnnotation), r.Key)),
+			Message:  fmt.Sprintf("Pod `%s` doesnt have annotation `%s`", req.NamespacedName, r.Key),
+		})
+	} else if v != r.Value {
+		evaluationResult.Issues = append(evaluationResult.Issues, Issue{
+			Severity: IssueSeverityInfo,
+			Label:    IssueLabel(fmt.Sprintf(string(IssueLabelUnexpectedAnnotationValue), r.Key)),
+			Message:  fmt.Sprintf("Pod `%s` annotations `%s` value is unexpected", req.NamespacedName, r.Key),
+		})
+	}
+
+	return evaluationResult
+}
+
+// IsPodAJob checks if the pod is a job
+func IsPodAJob(pod corev1.Pod) bool {
+	isJob := false
+	for _, o := range pod.OwnerReferences {
+		if o.Kind == "Job" {
+			isJob = true
+		}
+	}
+	return isJob
 }

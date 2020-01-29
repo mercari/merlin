@@ -34,11 +34,6 @@ spec:
         spec:
           description: PodEvaluatorSpec defines the desired state of PodEvaluator
           properties:
-            crashes:
-              description: Restarts is the number of restarts limit before we send
-                out a notification
-              format: int32
-              type: integer
             ignoreNamespaces:
               description: IgnoreNamespaces is the list of namespaces (string) to
                 ignore
@@ -63,6 +58,17 @@ spec:
                     enabled:
                       type: boolean
                   type: object
+                requiredAnnotations:
+                  items:
+                    properties:
+                      enabled:
+                        type: boolean
+                      key:
+                        type: string
+                      value:
+                        type: string
+                    type: object
+                  type: array
                 restarts:
                   properties:
                     enabled:

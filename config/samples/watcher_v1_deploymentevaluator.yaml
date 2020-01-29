@@ -14,5 +14,5 @@ spec:
     hasCanary:
       enabled: false
     replica:
-      min: 3
-      enabled: true
+      min: 2
+      enabled: false

@@ -39,6 +39,8 @@ const (
 	IssueLabelNotOwnedByReplicaset               IssueLabel = "not_owned_by_replicaset"
 	IssueLabelNotBelongToService                 IssueLabel = "not_belonged_to_service"
 	IssueLabelNotManagedByPDB                    IssueLabel = "not_managed_by_pdb"
+	IssueLabelMissingAnnotation                  IssueLabel = "missing_annotation_%s"
+	IssueLabelUnexpectedAnnotationValue          IssueLabel = "unexpected_annotation_value_%s"
 )
 
 // Issue is the problem found by the rules

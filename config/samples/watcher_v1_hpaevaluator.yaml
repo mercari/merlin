@@ -12,7 +12,7 @@ spec:
     - prometheus
   rules:
     reachedMaxReplica:
-      enabled: true
+      enabled: false
     invalidMetrics:
       enabled: true
 
