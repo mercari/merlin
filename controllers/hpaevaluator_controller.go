@@ -71,10 +71,9 @@ func (r *HPAEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, evaluationResult.Err
 	}
 
-	annotations := map[string]string{
-		AnnotationCheckedTime: time.Now().Format(time.RFC3339),
-		AnnotationIssue:       evaluationResult.IssuesLabelsAsString(),
-	}
+	annotations := hpa.GetAnnotations()
+	annotations[AnnotationCheckedTime] = time.Now().Format(time.RFC3339)
+	annotations[AnnotationIssue] = evaluationResult.IssuesLabelsAsString()
 	hpa.SetAnnotations(annotations)
 	if err := r.Update(ctx, &hpa); err != nil {
 		l.Error(err, "unable to update annotations")

@@ -69,10 +69,9 @@ func (r *SVCEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, evaluationResult.Err
 	}
 
-	annotations := map[string]string{
-		AnnotationCheckedTime: time.Now().Format(time.RFC3339),
-		AnnotationIssue:       evaluationResult.IssuesLabelsAsString(),
-	}
+	annotations := svc.GetAnnotations()
+	annotations[AnnotationCheckedTime] = time.Now().Format(time.RFC3339)
+	annotations[AnnotationIssue] = evaluationResult.IssuesLabelsAsString()
 	svc.SetAnnotations(annotations)
 	if err := r.Update(ctx, &svc); err != nil {
 		l.Error(err, "unable to update annotations")

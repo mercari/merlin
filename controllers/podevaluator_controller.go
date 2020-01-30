@@ -90,11 +90,9 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		l.Error(evaluationResult.Err, "hit error with evaluation")
 		return ctrl.Result{}, evaluationResult.Err
 	}
-
-	annotations := map[string]string{
-		AnnotationCheckedTime: time.Now().Format(time.RFC3339),
-		AnnotationIssue:       evaluationResult.IssuesLabelsAsString(),
-	}
+	annotations := pod.GetAnnotations()
+	annotations[AnnotationCheckedTime] = time.Now().Format(time.RFC3339)
+	annotations[AnnotationIssue] = evaluationResult.IssuesLabelsAsString()
 	pod.SetAnnotations(annotations)
 	if err := r.Update(ctx, &pod); err != nil {
 		l.Error(err, "unable to update annotations")

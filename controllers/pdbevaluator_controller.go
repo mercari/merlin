@@ -72,10 +72,9 @@ func (r *PDBEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, evaluationResult.Err
 	}
 
-	annotations := map[string]string{
-		AnnotationCheckedTime: time.Now().Format(time.RFC3339),
-		AnnotationIssue:       evaluationResult.IssuesLabelsAsString(),
-	}
+	annotations := pdb.GetAnnotations()
+	annotations[AnnotationCheckedTime] = time.Now().Format(time.RFC3339)
+	annotations[AnnotationIssue] = evaluationResult.IssuesLabelsAsString()
 	pdb.SetAnnotations(annotations)
 	if err := r.Update(ctx, &pdb); err != nil {
 		l.Error(err, "unable to update annotations")
