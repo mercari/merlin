@@ -1,15 +1,17 @@
 module github.com/kouzoh/merlin
 
-go 1.12
+go 1.13
 
 require (
-	github.com/imdario/mergo v0.3.8 // indirect
+	github.com/go-logr/logr v0.1.0
+	github.com/onsi/ginkgo v1.8.0
+	github.com/onsi/gomega v1.5.0
 	github.com/pkg/errors v0.8.1
-	go.uber.org/zap v1.13.0
-	golang.org/x/oauth2 v0.0.0-20191122200657-5d9234df094c // indirect
-	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
-	k8s.io/api v0.0.0-20190819141258-3544db3b9e44
-	k8s.io/apimachinery v0.0.0-20190817020851-f2f3a405f61d
-	k8s.io/client-go v0.0.0-20190819141724-e14f31a72a77
-	k8s.io/utils v0.0.0-20191114200735-6ca3b61696b6 // indirect
+	github.com/stretchr/testify v1.4.0 // indirect
+	go.uber.org/zap v1.9.1
+	gopkg.in/yaml.v2 v2.2.7 // indirect
+	k8s.io/api v0.0.0-20190918155943-95b840bb6a1f
+	k8s.io/apimachinery v0.0.0-20190913080033-27d36303b655
+	k8s.io/client-go v0.0.0-20190918160344-1fbdaa4c8d90
+	sigs.k8s.io/controller-runtime v0.4.0
 )

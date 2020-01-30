@@ -1,0 +1,20 @@
+# permissions to do viewer deploymentevaluators.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: deploymentevaluator-viewer-role
+rules:
+- apiGroups:
+  - watcher.merlin.mercari.com
+  resources:
+  - deploymentevaluators
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - watcher.merlin.mercari.com
+  resources:
+  - deploymentevaluators/status
+  verbs:
+  - get

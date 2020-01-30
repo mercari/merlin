@@ -1,0 +1,26 @@
+apiVersion: watcher.merlin.mercari.com/v1
+kind: PodEvaluator
+metadata:
+  name: pod-evaluator
+spec:
+  ignoreNamespaces:
+    - kube-system
+    - isto-system
+    - test
+    - spinnaker
+    - cert-manager
+    - prometheus
+  rules:
+    restarts:
+      enabled: true
+      threshold: 10
+    ownedByReplicaset:
+      enabled: true
+    belongsToService:
+      enabled: true
+    managedByPDB:
+      enabled: false
+    requiredAnnotations:
+      - key: "prometheus.io/scrape"
+        value: "true"
+        enabled: false

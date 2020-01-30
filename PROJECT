@@ -1,0 +1,22 @@
+domain: merlin.mercari.com
+repo: github.com/kouzoh/merlin
+resources:
+- group: watcher
+  kind: PodEvaluator
+  version: v1
+- group: watcher
+  kind: Notifiers
+  version: v1
+- group: watcher
+  kind: DeploymentEvaluator
+  version: v1
+- group: watcher
+  kind: PDBEvaluator
+  version: v1
+- group: watcher
+  kind: HPAEvaluator
+  version: v1
+- group: watcher
+  kind: NamespaceEvaluator
+  version: v1
+version: "2"

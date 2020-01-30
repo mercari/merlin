@@ -1,90 +1,127 @@
+/*
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package main
 
 import (
-	"context"
 	"flag"
-	"fmt"
 	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"time"
 
-	"github.com/kouzoh/merlin/controller"
-	"github.com/kouzoh/merlin/logger"
-	"go.uber.org/zap"
-	"k8s.io/client-go/kubernetes"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp" // for kubeclient GCP auth
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
+	watcherv1 "github.com/kouzoh/merlin/api/v1"
+	"github.com/kouzoh/merlin/controllers"
+	"k8s.io/apimachinery/pkg/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	// +kubebuilder:scaffold:imports
 )
 
-const (
-	exitError = 1
+var (
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
 )
-
-var kubeConfigPath string
 
 func init() {
-	flag.StringVar(&kubeConfigPath, "kubeConfig", "", "Path to a kube config. Only required if out-of-cluster.")
+	_ = clientgoscheme.AddToScheme(scheme)
+	_ = watcherv1.AddToScheme(scheme)
+	// +kubebuilder:scaffold:scheme
 }
 
 func main() {
+	var metricsAddr string
+	var enableLeaderElection bool
+	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
+	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
+		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	flag.Parse()
-	interval := os.Getenv("INTERVAL")
-	if interval == "" {
-		interval = "30"
-	}
-	checkInterval, err := strconv.Atoi(interval)
+
+	ctrl.SetLogger(zap.New(func(o *zap.Options) {
+		o.Development = false
+	}))
+
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		Scheme:             scheme,
+		MetricsBindAddress: metricsAddr,
+		LeaderElection:     enableLeaderElection,
+		Port:               9443,
+	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[ERROR] Failed to parse interval, is it int? error: %s\n", err)
+		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
 	}
 
-	logLevel := os.Getenv("LOG_LEVEL")
-	if logLevel == "" {
-		logLevel = "INFO"
+	if err = (&controllers.PodEvaluatorReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("PodEvaluator"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "PodEvaluator")
+		os.Exit(1)
 	}
 
-	log, err := logger.New(strings.ToUpper(logLevel))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[ERROR] Failed to create logger: %s\n", err)
-		os.Exit(exitError)
+	if err = (&controllers.DeploymentEvaluatorReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("DeploymentEvaluator"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "DeploymentEvaluator")
+		os.Exit(1)
 	}
 
-	var config *rest.Config
-
-	if kubeConfigPath == "" {
-		config, err = rest.InClusterConfig()
-	} else {
-		kubeConfigPath, err = filepath.Abs(kubeConfigPath)
-		if err != nil {
-			log.Fatal("cannot get absolute path of: ",
-				zap.String("kubeConfig path", kubeConfigPath),
-				zap.Error(err),
-			)
-		}
-
-		config, err = clientcmd.BuildConfigFromFlags("", kubeConfigPath)
-	}
-	if err != nil {
-		log.Fatal("failed to read kubeconfig",
-			zap.Error(err),
-		)
+	if err = (&controllers.HPAEvaluatorReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("HPAEvaluator"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "HPAEvaluator")
+		os.Exit(1)
 	}
 
-	ctx := context.Background()
+	if err = (&controllers.PDBEvaluatorReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("PDBEvaluator"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "PDBEvaluator")
+		os.Exit(1)
+	}
 
-	// create the clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		log.Fatal("failed to create kubernetes clientset",
-			zap.Error(err),
-		)
+	if err = (&controllers.NamespaceEvaluatorReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("NamespaceEvaluator"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "NamespaceEvaluator")
+		os.Exit(1)
 	}
-	c := controller.Controller{
-		Clientset: clientset,
-		Interval:  time.Duration(checkInterval) * time.Second,
-		Logger:    log,
+
+	if err = (&controllers.SVCEvaluatorReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("ServiceEvaluator"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ServiceEvaluator")
+		os.Exit(1)
 	}
-	c.Run(ctx)
+	// +kubebuilder:scaffold:builder
+
+	setupLog.Info("starting manager")
+	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		setupLog.Error(err, "problem running manager")
+		os.Exit(1)
+	}
+
 }

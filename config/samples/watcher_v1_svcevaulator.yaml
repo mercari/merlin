@@ -1,0 +1,13 @@
+apiVersion: watcher.merlin.mercari.com/v1
+kind: SVCEvaluator
+metadata:
+  name: svc-evaluator
+spec:
+  ignoreNamespaces:
+    - kube-system
+    - isto-system
+    - cert-manager
+    - prometheus
+  rules:
+    noMatchedPods:
+      enabled: true

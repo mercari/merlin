@@ -3,7 +3,6 @@ version: 2
 defaults: &defaults
   environment:
     CGO_ENABLED: 0
-    GOFLAGS: -mod=vendor
   working_directory: /opt/merlin
 
 golang: &golang
@@ -48,14 +47,28 @@ jobs:
           root: .
           paths: '*'
 
-  build:
+  test:
     <<: *golang
     steps:
       - attach_workspace:
           at: /opt/merlin
       - run:
-          name: Check compilation
-          command: make build
+          name: Install KubeBuilder
+          command: |
+            # From: https://kubebuilder.io/quick-start.html
+            os=$(go env GOOS)
+            arch=$(go env GOARCH)
+
+            # download kubebuilder and extract it to tmp
+            curl -sL https://go.kubebuilder.io/dl/2.2.0/${os}/${arch} | tar -xz -C /tmp/
+
+            # move to a long-term location and put it on your path
+            # (you'll need to set the KUBEBUILDER_ASSETS env var if you put it somewhere else)
+            mv /tmp/kubebuilder_2.2.0_${os}_${arch} /usr/local/kubebuilder
+            export PATH=$PATH:/usr/local/kubebuilder/bin
+      - run:
+          name: Run tests
+          command: make test
 
   push-image:
     <<: *gcloud
@@ -74,10 +87,13 @@ jobs:
             # Build version
             if [ "${CIRCLE_BRANCH}" == "master" ]; then
                 export VERSION=$(date +%Y%m%d)-${CIRCLE_BUILD_NUM}
-                export SUBSTITUTIONS="_BUILD_TARGET=master,_BUILD_VERSION=$VERSION,_BUILD_NUMBER=$CIRCLE_BUILD_NUM"
+                export TARGET=master
+            elif [ -n "${CIRCLE_PULL_REQUEST}" ]; then
+                export VERSION=$(basename ${CIRCLE_PULL_REQUEST})
+                export TARGET=pr
             else
-                echo "Change was not pushed to master branch, will not build image for it"
-                exit 1
+                echo "Change was not pushed to master branch nor pull request, will not build image for it"
+                exit 0
             fi
 
             echo "submittigng cloud build with SUBSTITUTIONS=$SUBSTITUTIONS"
@@ -85,8 +101,8 @@ jobs:
             gcloud builds submit . \
               --project=mercari-us-double \
               --config="cloudbuild.yaml" \
-              --gcs-log-dir="gs://mercari-us-double-cloudbuild-logs/logs" \
-              --substitutions="$SUBSTITUTIONS"
+              --gcs-log-dir="gs://mercari-us-double_cloudbuild_logs/logs" \
+              --substitutions="_BUILD_TARGET=$TARGET,_BUILD_VERSION=$VERSION,_BUILD_NUMBER=$CIRCLE_BUILD_NUM"
 
 workflows:
   version: 2
@@ -94,10 +110,10 @@ workflows:
     jobs:
       - modules:
           context: org-global
-      - build:
+      - test:
           requires:
             - modules
       - push-image:
           context: org-global
           requires:
-            - build
+            - test
