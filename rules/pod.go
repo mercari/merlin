@@ -119,7 +119,7 @@ type BelongsToService struct {
 
 func (r BelongsToService) Evaluate(ctx context.Context, req ctrl.Request, cli client.Client, log logr.Logger, pod corev1.Pod) *EvaluationResult {
 	evaluationResult := &EvaluationResult{}
-	if !r.Enabled || IsPodAJob(pod) {
+	if !r.Enabled || IsPodAJob(pod) || !IsPodHasPort(pod) {
 		return evaluationResult
 	}
 	// check what service the pod belongs to
@@ -225,4 +225,18 @@ func IsPodAJob(pod corev1.Pod) bool {
 		}
 	}
 	return isJob
+}
+
+func IsPodHasPort(pod corev1.Pod) bool {
+	hasPort := false
+	for _, c := range pod.Spec.Containers {
+		if c.Name == "istio-proxy" {
+			continue
+		}
+		if len(c.Ports) > 0 {
+			hasPort = true
+			break
+		}
+	}
+	return hasPort
 }

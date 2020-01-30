@@ -19,7 +19,7 @@ spec:
     belongsToService:
       enabled: true
     managedByPDB:
-      enabled: true
+      enabled: false
     requiredAnnotations:
       - key: "prometheus.io/scrape"
         value: "true"

@@ -36,19 +36,8 @@ type PodEvaluatorReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// TODO: better naming..?
-type PodInfo struct {
-	Name       string
-	NameSpace  string
-	Deployment string
-	ReplicaSet string
-	Service    string
-	HPA        string
-	PDB        string
-}
-
 // TODO: better way of handling this - it's used to coordinate b/w reconciliation processes.
-var podInfos = map[string]*PodInfo{}
+var podsInChecking = map[string]*corev1.Pod{}
 
 // +kubebuilder:rbac:groups=watcher.merlin.mercari.com,resources=podevaluators,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=watcher.merlin.mercari.com,resources=podevaluators/status,verbs=get;update;patch
@@ -88,14 +77,12 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 	podNameSlice := strings.Split(pod.Name, "-")
 	podBaseName := strings.Join(podNameSlice[:len(podNameSlice)-1], "-")
-	if _, ok := podInfos[podBaseName]; ok {
+	if _, ok := podsInChecking[podBaseName]; ok {
 		// same type of pod already exists in the map, no need to proceed the following checks
-		l.Info("Skip some checks for same set of pods", "pod", req.Name, "basename", podBaseName)
+		l.Info("Skip checks for same set of pods", "pod", req.Name, "basename", podBaseName)
 		return ctrl.Result{}, nil
 	}
-
-	info := PodInfo{Name: podBaseName}
-	podInfos[podBaseName] = &info
+	podsInChecking[podBaseName] = &pod
 
 	var resourceRules rules.ResourceRules = evaluator.Spec.Rules
 	evaluationResult := resourceRules.EvaluateAll(ctx, req, r.Client, l, pod)
@@ -122,13 +109,13 @@ func (r *PodEvaluatorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	// reset the map
-	podInfos = map[string]*PodInfo{}
+	podsInChecking = map[string]*corev1.Pod{}
 	return ctrl.Result{}, nil
 }
 
 func (r *PodEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	l := r.Log
-	podInfos = map[string]*PodInfo{}
+	podsInChecking = map[string]*corev1.Pod{}
 	if err := mgr.GetFieldIndexer().IndexField(&corev1.Pod{}, ".metadata.name", func(rawObj runtime.Object) []string {
 		pod := rawObj.(*corev1.Pod)
 		l.Info("indexing", "pod", pod.Name)
