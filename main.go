@@ -19,7 +19,7 @@ import (
 	"flag"
 	"os"
 
-	watcherv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1 "github.com/kouzoh/merlin/api/v1"
 	"github.com/kouzoh/merlin/controllers"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -36,7 +36,8 @@ var (
 
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
-	_ = watcherv1.AddToScheme(scheme)
+
+	_ = merlinv1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -63,57 +64,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.PodEvaluatorReconciler{
+	if err = (&controllers.PodReconciler{
 		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("PodEvaluator"),
+		Log:    ctrl.Log.WithName("ctrl").WithName("Pod"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "PodEvaluator")
+		setupLog.Error(err, "unable to create controller", "controller", "Pod")
 		os.Exit(1)
 	}
-
-	if err = (&controllers.DeploymentEvaluatorReconciler{
+	if err = (&controllers.HorizontalPodAutoscalerReconciler{
 		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("DeploymentEvaluator"),
+		Log:    ctrl.Log.WithName("ctrl").WithName("HorizontalPodAutoscaler"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DeploymentEvaluator")
-		os.Exit(1)
-	}
-
-	if err = (&controllers.HPAEvaluatorReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("HPAEvaluator"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "HPAEvaluator")
-		os.Exit(1)
-	}
-
-	if err = (&controllers.PDBEvaluatorReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("PDBEvaluator"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "PDBEvaluator")
-		os.Exit(1)
-	}
-
-	if err = (&controllers.NamespaceEvaluatorReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("NamespaceEvaluator"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "NamespaceEvaluator")
-		os.Exit(1)
-	}
-
-	if err = (&controllers.SVCEvaluatorReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ServiceEvaluator"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ServiceEvaluator")
+		setupLog.Error(err, "unable to create controller", "controller", "HorizontalPodAutoscaler")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
@@ -123,5 +87,4 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
-
 }

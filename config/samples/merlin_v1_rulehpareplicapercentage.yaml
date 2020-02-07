@@ -1,0 +1,18 @@
+apiVersion: merlin.mercari.com/v1
+kind: RuleHPAReplicaPercentage
+metadata:
+  namespace: default
+  name: rule-hpa-replica-percentage-100
+spec:
+  selector: # selector is only for namespaced rule
+    name: nginx
+    matchLabels:
+      app: nginx
+  percent: 100
+  notification:
+    notifiers:
+      - slack-fatal
+    suppressed: false
+    customMessageTemplate: "[{{.Severity}}] [`{{.ResourceName}}`] HPA current replica number percentage is 100%"
+    severity: warning
+

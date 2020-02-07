@@ -7,30 +7,6 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - ""
-  resources:
-  - events
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - appsv1
-  resources:
-  - deployments
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - appsv1
-  resources:
-  - replicasets
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - autoscalingv1
   resources:
   - hpa
@@ -47,33 +23,9 @@ rules:
   - list
   - watch
 - apiGroups:
-  - corev1
+  - merlin.mercari.com
   resources:
-  - services
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - corev1
-  resources:
-  - svc
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - policyv1beta1
-  resources:
-  - pdb
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - watcher.merlin.mercari.com
-  resources:
-  - deploymentevaluators
+  - horizontalpodautoscalers
   verbs:
   - create
   - delete
@@ -83,37 +35,17 @@ rules:
   - update
   - watch
 - apiGroups:
-  - watcher.merlin.mercari.com
+  - merlin.mercari.com
   resources:
-  - deploymentevaluators/status
+  - horizontalpodautoscalers/status
   verbs:
   - get
   - patch
   - update
 - apiGroups:
-  - watcher.merlin.mercari.com
+  - merlin.mercari.com
   resources:
-  - hpaevaluators
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - watcher.merlin.mercari.com
-  resources:
-  - hpaevaluators/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - watcher.merlin.mercari.com
-  resources:
-  - namespaceevaluators
+  - pods
   verbs:
   - create
   - delete
@@ -123,69 +55,9 @@ rules:
   - update
   - watch
 - apiGroups:
-  - watcher.merlin.mercari.com
+  - merlin.mercari.com
   resources:
-  - namespaceevaluators/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - watcher.merlin.mercari.com
-  resources:
-  - pdbevaluators
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - watcher.merlin.mercari.com
-  resources:
-  - pdbevaluators/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - watcher.merlin.mercari.com
-  resources:
-  - podevaluators
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - watcher.merlin.mercari.com
-  resources:
-  - podevaluators/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - watcher.merlin.mercari.com
-  resources:
-  - svcevaluators
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - watcher.merlin.mercari.com
-  resources:
-  - svcevaluators/status
+  - pods/status
   verbs:
   - get
   - patch

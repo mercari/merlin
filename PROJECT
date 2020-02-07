@@ -1,22 +1,25 @@
-domain: merlin.mercari.com
+domain: mercari.com
 repo: github.com/kouzoh/merlin
 resources:
-- group: watcher
-  kind: PodEvaluator
+- group: merlin
+  kind: RuleHPAReplicaPercentage
   version: v1
-- group: watcher
+- group: merlin
+  kind: PodResources
+  version: v1
+- group: merlin
+  kind: RulePodResources
+  version: v1
+- group: merlin
   kind: Notifiers
   version: v1
-- group: watcher
-  kind: DeploymentEvaluator
+- group: merlin
+  kind: ClusterRuleHPAReplicaPercentage
   version: v1
-- group: watcher
-  kind: PDBEvaluator
+- group: merlin
+  kind: Notifier
   version: v1
-- group: watcher
-  kind: HPAEvaluator
-  version: v1
-- group: watcher
-  kind: NamespaceEvaluator
+- group: merlin
+  kind: ClusterRuleHPAInvalidScaleTargetRef
   version: v1
 version: "2"

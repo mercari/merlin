@@ -1,0 +1,67 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.2.4
+  creationTimestamp: null
+  name: notifiers.merlin.mercari.com
+spec:
+  group: merlin.mercari.com
+  names:
+    kind: Notifier
+    listKind: NotifierList
+    plural: notifiers
+    singular: notifier
+  scope: Cluster
+  validation:
+    openAPIV3Schema:
+      description: Notifier is the Schema for the notifiers API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: NotifierSpec defines the desired state of Notifier
+          properties:
+            slack:
+              description: Slack is the notifier for slack
+              properties:
+                channel:
+                  type: string
+                severity:
+                  description: IssueSeverity indicates the severity of the issue
+                  type: string
+                webhook_url:
+                  type: string
+              required:
+              - channel
+              - severity
+              - webhook_url
+              type: object
+          type: object
+        status:
+          description: NotifierStatus defines the observed state of Notifier
+          type: object
+      type: object
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

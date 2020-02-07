@@ -1,0 +1,26 @@
+# permissions to do edit clusterrulehpainvalidscaletargetrefs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: clusterrulehpainvalidscaletargetref-editor-role
+rules:
+- apiGroups:
+  - merlin.mercari.com
+  resources:
+  - clusterrulehpainvalidscaletargetrefs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - merlin.mercari.com
+  resources:
+  - clusterrulehpainvalidscaletargetrefs/status
+  verbs:
+  - get
+  - patch
+  - update

@@ -10,6 +10,7 @@ import (
 const (
 	AnnotationCheckedTime = "merlin.mercari.com/checked-at"
 	AnnotationIssue       = "merlin.mercari.com/issue"
+	MinCheckInterval      = 10 * time.Second
 )
 
 type EventFilter struct {
@@ -17,10 +18,14 @@ type EventFilter struct {
 }
 
 func (f EventFilter) CreateEventFilter(e event.CreateEvent) bool {
-	// prevents from massive event processing at startup time,
-	// but if we have cache mechanism this might not be necessary
-	_, ok := e.Meta.GetAnnotations()[AnnotationCheckedTime]
-	return ok
+	if lastChecked, ok := e.Meta.GetAnnotations()[AnnotationCheckedTime]; ok {
+		lastCheckedTime, err := time.Parse(time.RFC3339, lastChecked)
+		if err != nil {
+			return true
+		}
+		return lastCheckedTime.Add(MinCheckInterval).Before(time.Now())
+	}
+	return true
 }
 
 func (f EventFilter) DeleteEventFilter(e event.DeleteEvent) bool {
@@ -36,8 +41,7 @@ func (f EventFilter) UpdateEventFilter(e event.UpdateEvent) bool {
 		if err != nil {
 			return true
 		}
-
-		return lastCheckedTime.Add(10 * time.Second).Before(time.Now())
+		return lastCheckedTime.Add(MinCheckInterval).Before(time.Now())
 	}
 	return true
 }
@@ -48,7 +52,7 @@ func (f EventFilter) GenericEventFilter(e event.GenericEvent) bool {
 		if err != nil {
 			return true
 		}
-		return lastCheckedTime.Add(10 * time.Second).Before(time.Now())
+		return lastCheckedTime.Add(MinCheckInterval).Before(time.Now())
 	}
 	return true
 }

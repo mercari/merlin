@@ -1,0 +1,93 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.2.4
+  creationTimestamp: null
+  name: clusterrulehpareplicapercentages.merlin.mercari.com
+spec:
+  group: merlin.mercari.com
+  names:
+    kind: ClusterRuleHPAReplicaPercentage
+    listKind: ClusterRuleHPAReplicaPercentageList
+    plural: clusterrulehpareplicapercentages
+    singular: clusterrulehpareplicapercentage
+  scope: Cluster
+  validation:
+    openAPIV3Schema:
+      description: ClusterRuleHPAReplicaPercentage is the Schema for the clusterrulehpareplicapercentages
+        API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: ClusterRuleHPAReplicaPercentageSpec defines the desired state
+            of ClusterRuleHPAReplicaPercentageSpec
+          properties:
+            ignoreNamespaces:
+              description: IgnoreNamespaces is the list of namespaces to ignore for
+                this rule
+              items:
+                type: string
+              type: array
+            notification:
+              description: Notification contains the channels and messages to send
+                out to external system, such as slack or pagerduty.
+              properties:
+                customMessageTemplate:
+                  description: CustomMessageTemplate can used for customized message,
+                    variables can be used are "ResourceName, Severity, and DefaultMessage"
+                  type: string
+                notifiers:
+                  description: Notifiers is the list of notifiers for this notification
+                    to send
+                  items:
+                    type: string
+                  type: array
+                severity:
+                  description: Severity is the severity of the issue
+                  type: string
+                suppressed:
+                  description: Suppressed means if this notification has been suppressed,
+                    useful for temporary
+                  type: boolean
+              required:
+              - notifiers
+              type: object
+            percent:
+              description: Percent is the threshold of percentage for a HPA current
+                replica divided by max replica to be considered as an issue.
+              format: int32
+              type: integer
+          required:
+          - notification
+          - percent
+          type: object
+        status:
+          description: ClusterRuleHPAReplicaPercentageStatus defines the observed
+            state of ClusterRuleHPAReplicaPercentageStatus
+          type: object
+      type: object
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
