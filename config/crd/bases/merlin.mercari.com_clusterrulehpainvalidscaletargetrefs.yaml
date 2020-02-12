@@ -57,7 +57,8 @@ spec:
                     type: string
                   type: array
                 severity:
-                  description: Severity is the severity of the issue
+                  description: Severity is the severity of the issue, one of info,
+                    warning, critical, or fatal
                   type: string
                 suppressed:
                   description: Suppressed means if this notification has been suppressed,

@@ -38,16 +38,20 @@ spec:
               description: Slack is the notifier for slack
               properties:
                 channel:
+                  description: Channel is the slack channel this notification should
+                    use
                   type: string
                 severity:
-                  description: IssueSeverity indicates the severity of the issue
+                  description: Severity is the severity of the issue, one of info,
+                    warning, critical, or fatal
                   type: string
-                webhook_url:
+                webhookURL:
+                  description: WebhookURL is the WebhookURL from slack
                   type: string
               required:
               - channel
               - severity
-              - webhook_url
+              - webhookURL
               type: object
           type: object
         status:

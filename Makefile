@@ -33,6 +33,10 @@ run: generate fmt vet manifests
 show-crd: manifests
 	kustomize build config/crd
 
+# Show Deploy configs
+show-deploy: manifests
+	kustomize build config/default
+
 # Install CRDs into a cluster
 install: manifests
 	kustomize build config/crd | kubectl apply -f -
