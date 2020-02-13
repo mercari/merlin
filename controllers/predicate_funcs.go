@@ -43,7 +43,7 @@ func (f EventFilter) UpdateEventFilter(e event.UpdateEvent) bool {
 		}
 		return lastCheckedTime.Add(MinCheckInterval).Before(time.Now())
 	}
-	return true
+	return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
 }
 
 func (f EventFilter) GenericEventFilter(e event.GenericEvent) bool {

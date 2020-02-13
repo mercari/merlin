@@ -65,12 +65,11 @@ func (r *HorizontalPodAutoscalerReconciler) Reconcile(req ctrl.Request) (ctrl.Re
 	for _, rule := range rulesToApply {
 		evaluationResult.Combine(rule.Evaluate(ctx, r.Client, l, hpa))
 	}
-	l.Info("results", "issues", evaluationResult.String())
 
 	// update annotations
 	annotations := hpa.GetAnnotations()
 	annotations[AnnotationCheckedTime] = time.Now().Format(time.RFC3339)
-	annotations[AnnotationIssue] = evaluationResult.IssuesLabelsAsString()
+	annotations[AnnotationIssue] = evaluationResult.String()
 	hpa.SetAnnotations(annotations)
 	if err := r.Update(ctx, &hpa); err != nil {
 		l.Error(err, "unable to update annotations")
@@ -78,6 +77,7 @@ func (r *HorizontalPodAutoscalerReconciler) Reconcile(req ctrl.Request) (ctrl.Re
 
 	// send messages if there's any issues
 	if annotations[AnnotationIssue] != "" {
+		l.Info("resource has issues", "issues", evaluationResult.String())
 		msg := evaluationResult.String()
 		l.Info(msg)
 		notifierList := merlinv1.NotifierList{}
@@ -92,7 +92,7 @@ func (r *HorizontalPodAutoscalerReconciler) Reconcile(req ctrl.Request) (ctrl.Re
 }
 
 func (r *HorizontalPodAutoscalerReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	l := r.Log
+	l := r.Log.WithName("SetupWithManager")
 	if err := mgr.GetFieldIndexer().IndexField(&autoscalingv1.HorizontalPodAutoscaler{}, ".metadata.name", func(rawObj runtime.Object) []string {
 		hpa := rawObj.(*autoscalingv1.HorizontalPodAutoscaler)
 		l.Info("indexing", "hpa", hpa.Name)

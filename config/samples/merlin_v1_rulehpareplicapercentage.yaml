@@ -11,7 +11,7 @@ spec:
   percent: 100
   notification:
     notifiers:
-      - slack-fatal
+      - slack-test
     suppressed: false
     customMessageTemplate: "[{{.Severity}}] [`{{.ResourceName}}`] HPA current replica number percentage is 100%"
     severity: warning

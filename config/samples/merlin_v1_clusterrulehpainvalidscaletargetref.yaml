@@ -8,6 +8,6 @@ spec:
     - kube-system
   notification:
     notifiers:
-      - slack-fatal
+      - slack-test
     suppressed: false
     severity: warning

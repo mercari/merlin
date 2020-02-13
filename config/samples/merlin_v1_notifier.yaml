@@ -1,20 +1,10 @@
 apiVersion: merlin.mercari.com/v1
 kind: Notifier
 metadata:
-  name: slack-fatal
+  name: slack-test
 spec:
   slack:
     severity: "warning" # every channel has its default severity, but can be override by the rule
     channel: "your_channel"
     webhookURL: "your_webhook_url"
 
----
-
-apiVersion: merlin.mercari.com/v1
-kind: Notifier
-metadata:
-  name: pagerduty-fatal
-spec:
-  pagerduty:
-    serviceKey: "your_service_key"
-    token: "token"

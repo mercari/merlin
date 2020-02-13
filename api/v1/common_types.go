@@ -44,7 +44,7 @@ type Notification struct {
 }
 
 func (n Notification) String() string {
-	return fmt.Sprintf("[%s] %s", n.Severity, n.CustomMessageTemplate)
+	return fmt.Sprintf("[%s] %s", n.Severity, n.DefaultMessage)
 }
 
 // +kubebuilder:object:generate=false
@@ -104,17 +104,8 @@ type EvaluationResult struct {
 	Issues []Issue
 }
 
-// String returns joined strings for all issues in the results
+// String returns joined labels for all issues in the results
 func (e *EvaluationResult) String() string {
-	messages := make([]string, len(e.Issues))
-	for i, issue := range e.Issues {
-		messages[i] = issue.Notification.String()
-	}
-	return strings.Join(messages, " \n")
-}
-
-// IssuesLabelsAsString returns joined labels for all issues in the results
-func (e *EvaluationResult) IssuesLabelsAsString() string {
 	issues := make([]string, len(e.Issues))
 	for i, issue := range e.Issues {
 		issues[i] = string(issue.Label)

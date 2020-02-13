@@ -1,32 +1,30 @@
 apiVersion: merlin.mercari.com/v1
 kind: ClusterRuleHPAReplicaPercentage
 metadata:
-  name: cluster-rule-hpa-replica-percentage-80
+  name: cluster-rule-hpa-replica-percentage-90
 spec:
   ignoreNamespaces: # ignoreNamespaces is only for cluster rule
     - istio-system
     - kube-system
-  percent: 80
+  percent: 90
   notification:
     notifiers:
-      - slack-warn
+      - slack-test
     suppressed: false
-    CustomMessageTemplate: "HPA current replica number percentage is too high"
     severity: warning
 
 ---
 apiVersion: merlin.mercari.com/v1
 kind: ClusterRuleHPAReplicaPercentage
 metadata:
-  name: cluster-rule-hpa-replica-percentage-50
+  name: cluster-rule-hpa-replica-percentage-80
 spec:
   ignoreNamespaces:
     - istio-system
     - kube-system
-  percent: 50
+  percent: 80
   notification:
     notifiers:
-      - slack-warn
+      - slack-test
     suppressed: false
-    CustomMessageTemplate: "HPA current replica number percentage is at 50%"
     severity: warning

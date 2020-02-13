@@ -74,10 +74,10 @@ func main() {
 	}
 	if err = (&controllers.HorizontalPodAutoscalerReconciler{
 		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("ctrl").WithName("HorizontalPodAutoscaler"),
+		Log:    ctrl.Log.WithName("ctrl").WithName("HPA"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "HorizontalPodAutoscaler")
+		setupLog.Error(err, "unable to create controller", "controller", "HPA")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
