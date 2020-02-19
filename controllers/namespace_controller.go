@@ -124,7 +124,7 @@ func (r *NamespaceReconciler) ListRules(ctx context.Context, req ctrl.Request, n
 	for _, cRule := range requiredLabels.Items {
 		ignoreNamespace := false
 		for _, ns := range cRule.Spec.IgnoreNamespaces {
-			if ns == req.Namespace {
+			if ns == req.Name { // note for namespace resource, its "namespace" is empty string
 				ignoreNamespace = true
 			}
 		}

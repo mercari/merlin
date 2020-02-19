@@ -19,12 +19,12 @@ var _ = Describe("NamespaceControllerTests", func() {
 	var ctx = context.Background()
 	var isNamespaceCreated = false
 	var testNamespace = "testns"
+	var kubeSystemNamespace = "kube-system"
 
 	BeforeEach(func() {
 		logf.Log.Info("Running test", "test", CurrentGinkgoTestDescription().FullTestText)
 		if !isNamespaceCreated {
-			err := k8sClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(k8sClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}})).Should(Succeed())
 		}
 		isNamespaceCreated = true
 	})
@@ -50,7 +50,7 @@ var _ = Describe("NamespaceControllerTests", func() {
 		Expect(k8sClient.Create(ctx, &merlinv1.ClusterRuleNamespaceRequiredLabel{
 			ObjectMeta: metav1.ObjectMeta{Name: name},
 			Spec: merlinv1.ClusterRuleNamespaceRequiredLabelSpec{
-				IgnoreNamespaces: []string{},
+				IgnoreNamespaces: []string{kubeSystemNamespace},
 				Notification:     merlinv1.Notification{Notifiers: []string{notifierName}},
 				Label:            merlinv1.RequiredLabel{Key: "istio-injection", Value: "enabled"},
 			},
@@ -67,6 +67,12 @@ var _ = Describe("NamespaceControllerTests", func() {
 			annotation, _ := n.ObjectMeta.Annotations[AnnotationIssue]
 			return annotation
 		}, time.Second*10, time.Millisecond*500).Should(Equal(string(merlinv1.IssueLabelNoRequiredLabel)))
+	})
 
+	It("TestApplyClusterRuleNamespaceRequiredLabelForIgnoredNamespace", func() {
+		n := &corev1.Namespace{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: kubeSystemNamespace}, n)).Should(Succeed())
+		annotation, _ := n.ObjectMeta.Annotations[AnnotationIssue]
+		Expect(annotation).To(Equal(""))
 	})
 })
