@@ -45,6 +45,26 @@ rules:
 - apiGroups:
   - merlin.mercari.com
   resources:
+  - namespaces
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - merlin.mercari.com
+  resources:
+  - namespaces/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - merlin.mercari.com
+  resources:
   - pods
   verbs:
   - create

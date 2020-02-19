@@ -1,0 +1,18 @@
+apiVersion: merlin.mercari.com/v1
+kind: ClusterRuleNamespaceRequiredLabel
+metadata:
+  name: istio-injection
+spec:
+  ignoreNamespaces:
+    - istio-system
+    - kube-system
+    - test
+  label:
+    key: istio-injection
+    value: enabled
+    match: exact # default to exact, can also use regexp and set value to a regex
+  notification:
+    notifiers:
+      - slack-test
+    suppressed: false
+    severity: info

@@ -23,9 +23,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/scheme"
 )
 
+const GROUP = "merlin.mercari.com"
+
 var (
 	// GroupVersion is group version used to register these objects
-	GroupVersion = schema.GroupVersion{Group: "merlin.mercari.com", Version: "v1"}
+	GroupVersion = schema.GroupVersion{Group: GROUP, Version: "v1"}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}

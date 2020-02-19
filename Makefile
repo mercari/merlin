@@ -15,74 +15,60 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
-all: manager
+.PHONY: help
+help: ## Show this help
+	@awk 'BEGIN {FS = ":.*?## "} /^[\/a-zA-Z_-]+:.*?## / {sub("\\\\n",sprintf("\n%22c"," "), $$2);printf "\033[36m%-25s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-# Run tests
-test: generate fmt vet manifests
-	go test ./... -coverprofile cover.out
+test: generate fmt vet manifests ## Run tests
+	go test ./... -coverprofile coverage.out
 
-# Build manager binary
-manager: generate fmt vet
+manager: generate fmt vet ## Build manager binary
 	go build -o bin/manager main.go
 
-# Run against the configured Kubernetes cluster in ~/.kube/config
-run: generate fmt vet manifests
+
+run: generate fmt vet manifests ## Run against the configured Kubernetes cluster in ~/.kube/config
 	go run ./main.go
 
-# Show CRDs
-show-crd: manifests
+show-crd: manifests ## Show CRDs
 	kustomize build config/crd
 
-# Show Deploy configs
-show-deploy: manifests
+show-deploy: manifests ## Show Deploy configs
 	kustomize build config/default
 
-# Install CRDs into a cluster
-install: manifests
+install: manifests ## Install CRDs into a cluster
 	kustomize build config/crd | kubectl apply -f -
 
-# Uninstall CRDs from a cluster
-uninstall: manifests
+uninstall: manifests ## Uninstall CRDs from a cluster
 	kustomize build config/crd | kubectl delete -f -
 
-# Apply sample configs
-apply-sample-configs:
+apply-samples: ## Apply samples
 	@for SAMPLE in $(SAMPLE_COFIGS); do \
 		kubectl apply -f $${SAMPLE}; \
 	done
 
-# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-deploy: manifests
+deploy: manifests ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 	cd config/manager && kustomize edit set image controller=${IMG}
 	kustomize build config/default | kubectl apply -f -
 
-# Generate manifests e.g. CRD, RBAC etc.
-manifests: controller-gen
+manifests: controller-gen ## Generate manifests e.g. CRD, RBAC etc.
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
-# Run go fmt against code
-fmt:
+fmt: ## Run go fmt against code
 	go fmt ./...
 
-# Run go vet against code
-vet:
+vet: ## Run go vet against code
 	go vet ./...
 
-# Generate code
-generate: controller-gen
+generate: controller-gen ## Generate code
 	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths="./..."
 
-# Build the docker image
-docker-build: test
+docker-build: test ## Build the docker image
 	docker build . -t ${IMG}
 
-# Push the docker image
-docker-push:
+docker-push: ## Push the docker image
 	docker push ${IMG}
 
-# find or download controller-gen
-# download controller-gen if necessary
-controller-gen:
+controller-gen: ## find controller-gen, download controller-gen if necessary
 ifeq (, $(shell which controller-gen))
 	@{ \
 	set -e ;\

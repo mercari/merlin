@@ -24,7 +24,9 @@ import (
 
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -32,12 +34,12 @@ import (
 	// +kubebuilder:scaffold:imports
 )
 
-// These tests use Ginkgo (BDD-style Go testing framework). Refer to
-// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
-
-var cfg *rest.Config
-var k8sClient client.Client
-var testEnv *envtest.Environment
+var (
+	cfg       *rest.Config
+	k8sClient client.Client
+	testEnv   *envtest.Environment
+	stopCh    chan struct{}
+)
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -63,10 +65,20 @@ var _ = BeforeSuite(func(done Done) {
 	err = merlinv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = merlinv1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-
 	// +kubebuilder:scaffold:scheme
+
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{})
+	Expect(err).NotTo(HaveOccurred(), "failed to create manager")
+
+	hpaCtrl := &HorizontalPodAutoscalerReconciler{Client: mgr.GetClient(), Log: logf.Log, Scheme: mgr.GetScheme()}
+	Expect(hpaCtrl.SetupWithManager(mgr)).Should(Succeed(), "failed to setup hpa controller")
+
+	nsCtrl := &NamespaceReconciler{Client: mgr.GetClient(), Log: logf.Log, Scheme: mgr.GetScheme()}
+	Expect(nsCtrl.SetupWithManager(mgr)).Should(Succeed(), "failed to setup namespace controller")
+
+	go func() {
+		Expect(mgr.Start(stopCh)).Should(Succeed(), "failed to start manager")
+	}()
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).ToNot(HaveOccurred())

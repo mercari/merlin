@@ -70,11 +70,10 @@ func (r ClusterRuleHPAReplicaPercentage) Evaluate(ctx context.Context, cli clien
 
 	l.Info("percentage", "p", r.Spec.Percent)
 	if float64(hpa.Status.CurrentReplicas)/float64(hpa.Spec.MaxReplicas) >= float64(r.Spec.Percent)/100.0 {
-		notification := r.Spec.Notification
-		notification.DefaultMessage = "HPA current replica percentage is high"
 		evaluationResult.Issues = append(evaluationResult.Issues, Issue{
-			Label:        IssueLabelHighReplicaPercent,
-			Notification: notification,
+			Label:          IssueLabelHighReplicaPercent,
+			DefaultMessage: fmt.Sprintf("HPA current replica percentage is higher than %v", r.Spec.Percent),
+			Notification:   r.Spec.Notification,
 		})
 	}
 	return evaluationResult

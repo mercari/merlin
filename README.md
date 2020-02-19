@@ -13,21 +13,31 @@ make install
 to install the CRDs
 
 
-### Adding evaluators
-Once CRDs are installed, you can start setting what rules you'd like to have, there are several samples under `config/samples`, 
-e.g., to install `PodEvaulator`, run 
+
+### Uninstall CRDs
+To uninstall CRDs, you can run:
 ```bash
-kubectl apply -f config/samples/watcher_v1_podevaluator.yaml
+make uninstall
 ```
 
 
-### Install controller
-After you've installed the evaluators, run
+### Sample custom resources
+Once CRDs are installed, you can start setting what rules you'd like to have, there are several samples under `config/samples`, 
+you can run 
+```bash
+kubectl apply-samples
+```
+to apply all sample resources
+
+
+### Install controller manager
+After you've applied the custom resources, run
 ```bash
 make deploy
 ``` 
 to install the controller.
 
+Note this will create a namespace called `merlin-us-dev` and install the controller manager in it.
 
 ### Debugging
 You can also run the controller locally for debugging, just run 

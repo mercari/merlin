@@ -98,11 +98,10 @@ func (r ClusterRuleHPAInvalidScaleTargetRef) Evaluate(ctx context.Context, cli c
 		l.Info("Unknown HPA ScaleTargetRef kind", "kind", hpa.Spec.ScaleTargetRef.Kind, "name", hpa.Spec.ScaleTargetRef.Name)
 	}
 	if !match {
-		notification := r.Spec.Notification
-		notification.DefaultMessage = "HPA ScaleTargetRef is incorrect"
 		evaluationResult.Issues = append(evaluationResult.Issues, Issue{
-			Label:        IssueLabelInvalidScaleTargetRef,
-			Notification: notification,
+			Label:          IssueLabelInvalidScaleTargetRef,
+			DefaultMessage: "HPA ScaleTargetRef is incorrect",
+			Notification:   r.Spec.Notification,
 		})
 	}
 	return evaluationResult

@@ -2,7 +2,7 @@ apiVersion: merlin.mercari.com/v1
 kind: RuleHPAReplicaPercentage
 metadata:
   namespace: default
-  name: rule-hpa-replica-percentage-100
+  name: 100-percent
 spec:
   selector: # selector is only for namespaced rule
     name: nginx

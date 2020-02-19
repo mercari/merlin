@@ -2,14 +2,15 @@ package controllers
 
 import (
 	"github.com/go-logr/logr"
+	merlinv1 "github.com/kouzoh/merlin/api/v1"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"time"
 )
 
 const (
-	AnnotationCheckedTime = "merlin.mercari.com/checked-at"
-	AnnotationIssue       = "merlin.mercari.com/issue"
+	AnnotationCheckedTime = merlinv1.GROUP + "/checked-at"
+	AnnotationIssue       = merlinv1.GROUP + "/issue"
 	MinCheckInterval      = 10 * time.Second
 )
 

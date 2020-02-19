@@ -22,4 +22,7 @@ resources:
 - group: merlin
   kind: ClusterRuleHPAInvalidScaleTargetRef
   version: v1
+- group: merlin
+  kind: ClusterRuleNamespaceRequiredLabel
+  version: v1
 version: "2"

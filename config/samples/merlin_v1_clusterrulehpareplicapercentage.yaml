@@ -1,7 +1,7 @@
 apiVersion: merlin.mercari.com/v1
 kind: ClusterRuleHPAReplicaPercentage
 metadata:
-  name: cluster-rule-hpa-replica-percentage-90
+  name: 90-percent
 spec:
   ignoreNamespaces: # ignoreNamespaces is only for cluster rule
     - istio-system
@@ -13,18 +13,3 @@ spec:
     suppressed: false
     severity: warning
 
----
-apiVersion: merlin.mercari.com/v1
-kind: ClusterRuleHPAReplicaPercentage
-metadata:
-  name: cluster-rule-hpa-replica-percentage-80
-spec:
-  ignoreNamespaces:
-    - istio-system
-    - kube-system
-  percent: 80
-  notification:
-    notifiers:
-      - slack-test
-    suppressed: false
-    severity: warning

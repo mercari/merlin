@@ -68,6 +68,9 @@ func (r *HorizontalPodAutoscalerReconciler) Reconcile(req ctrl.Request) (ctrl.Re
 
 	// update annotations
 	annotations := hpa.GetAnnotations()
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
 	annotations[AnnotationCheckedTime] = time.Now().Format(time.RFC3339)
 	annotations[AnnotationIssue] = evaluationResult.String()
 	hpa.SetAnnotations(annotations)
@@ -107,6 +110,7 @@ func (r *HorizontalPodAutoscalerReconciler) SetupWithManager(mgr ctrl.Manager) e
 		For(&merlinv1.RuleHPAReplicaPercentage{}).
 		For(&autoscalingv1.HorizontalPodAutoscaler{}).
 		WithEventFilter(GetPredicateFuncs(l)).
+		Named(autoscalingv1.HorizontalPodAutoscaler{}.Kind).
 		Complete(r)
 }
 

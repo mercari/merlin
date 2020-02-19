@@ -89,7 +89,7 @@ func (n NotifierList) NotifyAll(evaluationResult EvaluationResult, l logr.Logger
 					msgContents := MessageContents{
 						Severity:       string(severity),
 						ResourceName:   evaluationResult.NamespacedName.String(),
-						DefaultMessage: i.Notification.DefaultMessage,
+						DefaultMessage: i.DefaultMessage,
 					}
 					if i.Notification.CustomMessageTemplate != "" {
 						msgTemplate = i.Notification.CustomMessageTemplate

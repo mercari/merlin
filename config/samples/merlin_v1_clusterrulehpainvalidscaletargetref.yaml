@@ -1,7 +1,7 @@
 apiVersion: merlin.mercari.com/v1
 kind: ClusterRuleHPAInvalidScaleTargetRef
 metadata:
-  name: cluster-rule-hpa-invalid-scale-target-ref
+  name: invalid-scale-target-ref
 spec:
   ignoreNamespaces: # ignoreNamespaces is only for cluster rule
     - istio-system
