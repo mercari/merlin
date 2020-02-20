@@ -11,7 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"strings"
-	"time"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -60,13 +59,6 @@ var _ = Describe("NamespaceControllerTests", func() {
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name}, rule)).Should(Succeed())
 		Expect(rule.Name).To(Equal(name))
 		Expect(rule.Spec.Notification.Notifiers[0]).To(Equal(notifierName))
-
-		Eventually(func() string {
-			n := &corev1.Namespace{}
-			k8sClient.Get(ctx, types.NamespacedName{Name: testNamespace}, n)
-			annotation, _ := n.ObjectMeta.Annotations[AnnotationIssue]
-			return annotation
-		}, time.Second*10, time.Millisecond*500).Should(Equal(string(merlinv1.IssueLabelNoRequiredLabel)))
 	})
 
 	It("TestApplyClusterRuleNamespaceRequiredLabelForIgnoredNamespace", func() {

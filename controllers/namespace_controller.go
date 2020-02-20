@@ -17,8 +17,6 @@ package controllers
 
 import (
 	"context"
-	"time"
-
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -67,19 +65,20 @@ func (r *NamespaceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	// update annotations
-	annotations := namespace.GetAnnotations()
-	if annotations == nil {
-		annotations = map[string]string{}
+	annotations := map[string]string{}
+	// temp fix - namespace annotation will cause terraform plan to update, so dont put annotations in namespace.
+	for k, v := range namespace.GetAnnotations() {
+		if k != AnnotationCheckedTime && k != AnnotationIssue {
+			annotations[k] = v
+		}
 	}
-	annotations[AnnotationCheckedTime] = time.Now().Format(time.RFC3339)
-	annotations[AnnotationIssue] = evaluationResult.String()
 	namespace.SetAnnotations(annotations)
 	if err := r.Update(ctx, &namespace); err != nil {
 		l.Error(err, "unable to update annotations")
 	}
 
 	// send messages if there's any issues
-	if annotations[AnnotationIssue] != "" {
+	if len(evaluationResult.Issues) > 0 {
 		l.Info("resource has issues", "issues", evaluationResult.String())
 		msg := evaluationResult.String()
 		l.Info(msg)
