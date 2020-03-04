@@ -32,6 +32,12 @@ type PodReconciler struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
+	// Notifiers stores the notifiers as cache, this will be updated when any notifier updates happen,
+	// and also servers as cache so we dont need to get list of notifiers every time
+	Notifiers map[string]*merlinv1.Notifier
+	// Generations stores the rule generation, to be used for event filter to determine if events are from Reconciler
+	// This is required since status updates also increases generation, so we cant use metadata's generation.
+	Generations map[string]int64
 }
 
 // +kubebuilder:rbac:groups=merlin.mercari.com,resources=pods,verbs=get;list;watch;create;update;patch;delete
@@ -41,8 +47,6 @@ type PodReconciler struct {
 func (r *PodReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
 	_ = r.Log.WithValues("pod", req.NamespacedName)
-
-	// your logic here
 
 	return ctrl.Result{}, nil
 }

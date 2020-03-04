@@ -17,11 +17,16 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/source"
+	"strings"
 
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
 )
@@ -31,6 +36,12 @@ type NamespaceReconciler struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
+	// Notifiers stores the notifiers as cache, this will be updated when any notifier updates happen,
+	// and also servers as cache so we dont need to get list of notifiers every time
+	Notifiers map[string]*merlinv1.Notifier
+	// Generations stores the rule generation, to be used for event filter to determine if events are from Reconciler
+	// This is required since status updates also increases generation, so we cant use metadata's generation.
+	Generations map[string]int64
 }
 
 // +kubebuilder:rbac:groups=merlin.mercari.com,resources=namespaces,verbs=get;list;watch;create;update;patch;delete
@@ -38,8 +49,39 @@ type NamespaceReconciler struct {
 
 func (r *NamespaceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	l := r.Log.WithName("Reconcile").WithValues("namespace", req.Name)
+	l := r.Log.WithName("Reconcile")
 
+	//  check if it's clusterRule or rule changes
+	resourceNames := strings.Split(req.Name, Separator)
+	if len(resourceNames) >= 2 {
+		l = l.WithValues("rule", req.Name)
+		var rule merlinv1.Rule
+		var err error
+		switch resourceNames[0] {
+		case GetStructName(merlinv1.ClusterRuleNamespaceRequiredLabel{}):
+			rule = &merlinv1.ClusterRuleNamespaceRequiredLabel{}
+			if err = r.Client.Get(ctx, types.NamespacedName{Namespace: req.Namespace, Name: resourceNames[1]}, rule); err != nil && !apierrs.IsNotFound(err) {
+				return ctrl.Result{RequeueAfter: RequeueIntervalForError}, err
+			}
+
+		default:
+			// this should not happen since we only watches resources we care, but just in case we forget to add handling
+			e := fmt.Errorf("unexpected resource change")
+			l.Error(e, req.NamespacedName.String())
+			return ctrl.Result{}, e
+		}
+		if apierrs.IsNotFound(err) {
+			// TODO: resource is deleted, clear all alerts
+			return ctrl.Result{}, nil
+		}
+		if err := rule.Evaluate(ctx, r.Client, l, nil, r.Notifiers); err != nil {
+			return ctrl.Result{}, err
+		}
+		r.Generations[rule.GetName()] = rule.GetGeneration() + 1
+		return ctrl.Result{}, nil
+	}
+
+	l = l.WithValues("namespace", req.Name)
 	namespace := corev1.Namespace{}
 	if err := r.Client.Get(ctx, req.NamespacedName, &namespace); client.IgnoreNotFound(err) != nil {
 		l.Error(err, "failed to get namespace")
@@ -59,35 +101,10 @@ func (r *NamespaceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	// running evaluation and combine results
 	l.Info("Evaluating namespace")
-	evaluationResult := &merlinv1.EvaluationResult{NamespacedName: req.NamespacedName}
 	for _, rule := range rulesToApply {
-		evaluationResult.Combine(rule.Evaluate(ctx, r.Client, l, namespace))
-	}
-
-	// update annotations
-	annotations := map[string]string{}
-	// temp fix - namespace annotation will cause terraform plan to update, so dont put annotations in namespace.
-	for k, v := range namespace.GetAnnotations() {
-		if k != AnnotationCheckedTime && k != AnnotationIssue {
-			annotations[k] = v
-		}
-	}
-	namespace.SetAnnotations(annotations)
-	if err := r.Update(ctx, &namespace); err != nil {
-		l.Error(err, "unable to update annotations")
-	}
-
-	// send messages if there's any issues
-	if len(evaluationResult.Issues) > 0 {
-		l.Info("resource has issues", "issues", evaluationResult.String())
-		msg := evaluationResult.String()
-		l.Info(msg)
-		notifierList := merlinv1.NotifierList{}
-		if err := r.List(ctx, &notifierList); client.IgnoreNotFound(err) != nil {
-			l.Error(err, "failed to get NotifierList")
+		if err := rule.Evaluate(ctx, r.Client, l, namespace, r.Notifiers); err != nil {
 			return ctrl.Result{}, err
 		}
-		notifierList.NotifyAll(*evaluationResult, l)
 	}
 
 	return ctrl.Result{}, nil
@@ -95,6 +112,16 @@ func (r *NamespaceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 func (r *NamespaceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	l := r.Log.WithName("SetupWithManager")
+	r.Generations = map[string]int64{}
+
+	if err := mgr.GetFieldIndexer().IndexField(&merlinv1.ClusterRuleNamespaceRequiredLabel{}, indexField, func(rawObj runtime.Object) []string {
+		obj := rawObj.(*merlinv1.ClusterRuleNamespaceRequiredLabel)
+		l.Info("indexing", GetStructName(obj), obj.Name)
+		return []string{obj.Name}
+	}); err != nil {
+		return err
+	}
+
 	if err := mgr.GetFieldIndexer().IndexField(&corev1.Namespace{}, ".metadata.name", func(rawObj runtime.Object) []string {
 		namespace := rawObj.(*corev1.Namespace)
 		l.Info("indexing", "namespace", namespace.Name)
@@ -102,18 +129,21 @@ func (r *NamespaceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}); err != nil {
 		return err
 	}
-	l.Info("init manager")
+
+	l.Info("initialize manager")
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&merlinv1.ClusterRuleNamespaceRequiredLabel{}).
 		For(&corev1.Namespace{}).
-		WithEventFilter(GetPredicateFuncs(l)).
+		Watches(
+			&source.Kind{Type: &merlinv1.ClusterRuleNamespaceRequiredLabel{}},
+			&EventHandler{Log: l, Kind: GetStructName(merlinv1.ClusterRuleNamespaceRequiredLabel{}), ObjectGenerations: r.Generations}).
+		WithEventFilter(GetPredicateFuncs(l, nil)).
 		Named(corev1.Namespace{}.Kind).
 		Complete(r)
 }
 
-func (r *NamespaceReconciler) ListRules(ctx context.Context, req ctrl.Request, namespace corev1.Namespace) ([]Rule, error) {
+func (r *NamespaceReconciler) ListRules(ctx context.Context, req ctrl.Request, namespace corev1.Namespace) ([]merlinv1.Rule, error) {
 	l := r.Log.WithName("ListRules").WithValues("namespace", req.Namespace)
-	var rules []Rule
+	var rules []merlinv1.Rule
 	requiredLabels := merlinv1.ClusterRuleNamespaceRequiredLabelList{}
 	if err := r.List(ctx, &requiredLabels); client.IgnoreNotFound(err) != nil {
 		l.Error(err, "failed to get ClusterRuleNamespaceRequiredLabel")
@@ -128,7 +158,7 @@ func (r *NamespaceReconciler) ListRules(ctx context.Context, req ctrl.Request, n
 			}
 		}
 		if !ignoreNamespace {
-			rules = append(rules, cRule)
+			rules = append(rules, &cRule)
 		}
 	}
 	return rules, nil

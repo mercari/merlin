@@ -1,19 +1,36 @@
 package v1
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"regexp"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
+	"text/template"
+	"time"
+)
+
+const (
+	MessageTemplateVariableSeverity       = "{{.Severity}}"
+	MessageTemplateVariableResourceKind   = "{{.ResourceKind}}"
+	MessageTemplateVariableResourceName   = "{{.ResourceName}}"
+	MessageTemplateVariableDefaultMessage = "{{.DefaultMessage}}"
+
+	DefaultMessageTemplate = "[" + MessageTemplateVariableSeverity + "] " + MessageTemplateVariableResourceKind + " `" + MessageTemplateVariableResourceName + "` " + MessageTemplateVariableDefaultMessage
 )
 
 // +kubebuilder:object:generate=false
 
 type Rule interface {
-	Evaluate(ctx context.Context, cli client.Client, log logr.Logger, resource interface{}) *EvaluationResult
+	Evaluate(ctx context.Context, cli client.Client, log logr.Logger, resource interface{}, notifiers map[string]*Notifier) error
+	GetName() string
+	GetGeneration() int64
+	GetObjectKind() schema.ObjectKind
+	DeepCopyObject() runtime.Object
 }
 
 // RequiredLabel is the
@@ -26,18 +43,14 @@ type RequiredLabel struct {
 	Match string `json:"match,omitempty"`
 }
 
-func (r RequiredLabel) Validate(labels map[string]string) (issue Issue, err error) {
+func (r RequiredLabel) Validate(labels map[string]string) (violation string, err error) {
 	v, ok := labels[r.Key]
 	if !ok {
-		issue.Label = IssueLabelNoRequiredLabel
-		issue.DefaultMessage = fmt.Sprintf("Namespace doenst have required label %s", r.Key)
-		return
+		return fmt.Sprintf("resource doenst have required label %s", r.Key), nil
 	}
 	if r.Match == "" || r.Match == "exact" {
 		if v != r.Value {
-			issue.Label = IssueLabelIncorrectRequiredLabelValue
-			issue.DefaultMessage = fmt.Sprintf("Namespace has incorrect label value %s (expect %s) for label %s", v, r.Value, r.Key)
-			return
+			return fmt.Sprintf("resource has incorrect label value %s (expect %s) for label %s", v, r.Value, r.Key), nil
 		}
 	} else if r.Match == "regexp" {
 		var re *regexp.Regexp
@@ -46,9 +59,7 @@ func (r RequiredLabel) Validate(labels map[string]string) (issue Issue, err erro
 			return
 		}
 		if len(re.FindAllString(v, -1)) <= 0 {
-			issue.Label = IssueLabelIncorrectRequiredLabelValue
-			issue.DefaultMessage = fmt.Sprintf("Namespace has incorrect label value %s (regex match %s) for label %s", v, r.Value, r.Key)
-			return
+			return fmt.Sprintf("Namespace has incorrect label value %s (regex match %s) for label %s", v, r.Value, r.Key), nil
 		}
 	}
 	return
@@ -71,102 +82,67 @@ func (s *Selector) IsLabelMatched(resourceLabels map[string]string) bool {
 }
 
 type Notification struct {
-	// Notifiers is the list of notifiers for this notification to send
+	// NotifiersCache is the list of notifiers for this notification to send
 	Notifiers []string `json:"notifiers"`
 	// Suppressed means if this notification has been suppressed, useful for temporary
 	Suppressed bool `json:"suppressed,omitempty"`
 	// Severity is the severity of the issue, one of info, warning, critical, or fatal
-	Severity IssueSeverity `json:"severity,omitempty"`
+	Severity string `json:"severity,omitempty"`
 	// CustomMessageTemplate can used for customized message, variables can be used are "ResourceName, Severity, and DefaultMessage"
 	CustomMessageTemplate string `json:"customMessageTemplate,omitempty"`
 }
 
-// +kubebuilder:object:generate=false
-// IssueSeverity indicates the severity of the issue
-type IssueSeverity string
+func (n Notification) ParseMessage(resourceName types.NamespacedName, resourceKind, defaultMessage string) (string, error) {
+	messageTemplate := n.CustomMessageTemplate
+	if n.CustomMessageTemplate == "" {
+		messageTemplate = DefaultMessageTemplate
+	}
+	messageVariables := MessageTemplateVariables{
+		Severity:       string(n.Severity),
+		ResourceName:   resourceName,
+		ResourceKind:   resourceKind,
+		DefaultMessage: defaultMessage,
+	}
+	t, err := template.New("msg").Parse(messageTemplate)
+	if err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, messageVariables); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
 
-const (
-	IssueSeverityDefault  IssueSeverity = ""
-	IssueSeverityFatal    IssueSeverity = "fatal"
-	IssueSeverityCritical IssueSeverity = "critical"
-	IssueSeverityWarning  IssueSeverity = "warning"
-	IssueSeverityInfo     IssueSeverity = "info"
-)
-
-// +kubebuilder:object:generate=false
-// IssueLabel is the label for the issue, in shorter text.
-type IssueLabel string
-
-const (
-	IssueLabelNone                        IssueLabel = ""
-	IssueLabelHasNoEnoughReplica          IssueLabel = "no_enough_replica"
-	IssueLabelMinReplicaTooLow            IssueLabel = "min_replica_too_low"
-	IssueLabelHasNoCanaryDeployment       IssueLabel = "no_canary_deployment"
-	IssueLabelHighReplicaPercent          IssueLabel = "high_replica_percent"
-	IssueLabelInvalidSetting              IssueLabel = "invalid_setting"
-	IssueLabelInvalidScaleTargetRef       IssueLabel = "invalid_scale_target_ref"
-	IssueLabelNoRequiredLabel             IssueLabel = "no_required_label"
-	IssueLabelIncorrectRequiredLabelValue IssueLabel = "incorrect_required_label_value"
-	IssueLabelNoMatchedPods               IssueLabel = "no_matched_pods"
-	IssueLabelTooManyRestarts             IssueLabel = "too_many_restarts"
-	IssueLabelNotOwnedByReplicaset        IssueLabel = "not_owned_by_replicaset"
-	IssueLabelNotBelongToService          IssueLabel = "not_belonged_to_service"
-	IssueLabelNotManagedByPDB             IssueLabel = "not_managed_by_pdb"
-	IssueLabelMissingAnnotation           IssueLabel = "missing_annotation_%s"
-	IssueLabelUnexpectedAnnotationValue   IssueLabel = "unexpected_annotation_value_%s"
-)
-
-// +kubebuilder:object:generate=false
-// Issue is the problem found by the rules
-type Issue struct {
-	Label          IssueLabel
+type MessageTemplateVariables struct {
+	ResourceName   types.NamespacedName
+	ResourceKind   string
+	Severity       string
 	DefaultMessage string
-	Notification   Notification
 }
 
-// String returns the string of the issue, combined with severity and message.
-func (i Issue) String() string {
-	return fmt.Sprintf("[%s] %s", i.Notification.Severity, i.DefaultMessage)
+type RuleStatus struct {
+	CheckedAt  string            `json:"checkedAt,omitempty"`
+	Violations map[string]string `json:"violations,omitempty"`
 }
 
-// +kubebuilder:object:generate=false
-// EvaluationResult is the result after evaluation
-type EvaluationResult struct {
-	// NamespacedName is the resource name with namespace prefixed.
-	NamespacedName types.NamespacedName
-	// Err is the operational error (code or api problems, not the resource issue.)
-	Err error
-	// Issues are the list of issues from the evaluation
-	Issues []Issue
+func (r *RuleStatus) AddViolation(namespacedName types.NamespacedName) {
+	if r.Violations == nil {
+		r.Violations = map[string]string{}
+	}
+	r.Violations[namespacedName.String()] = time.Now().Format(time.RFC3339)
 }
 
-// String returns joined labels for all issues in the results
-func (e *EvaluationResult) String() string {
-	issues := make([]string, len(e.Issues))
-	for i, issue := range e.Issues {
-		issues[i] = string(issue.Label)
+func (r *RuleStatus) RemoveViolation(namespacedName types.NamespacedName) {
+	if r.Violations == nil {
+		r.Violations = map[string]string{}
 	}
-	return strings.Join(issues, ";")
+	_, ok := r.Violations[namespacedName.String()]
+	if ok {
+		delete(r.Violations, namespacedName.String())
+	}
 }
 
-// Combine takes results and combine them
-func (e *EvaluationResult) Combine(a *EvaluationResult) *EvaluationResult {
-	var err error
-	if e.Err != nil {
-		err = e.Err
-	}
-	if a.Err != nil {
-		if err != nil {
-			// both are not nil, combine them
-			e.Err = fmt.Errorf("%s, %s", e.Err.Error(), a.Err.Error())
-		} else {
-			err = a.Err
-		}
-	}
-	e.Err = err
-
-	for _, i := range a.Issues {
-		e.Issues = append(e.Issues, i)
-	}
-	return e
+func (in *RuleStatus) SetCheckTime() {
+	in.CheckedAt = time.Now().Format(time.RFC3339)
 }

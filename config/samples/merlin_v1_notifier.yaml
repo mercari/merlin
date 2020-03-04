@@ -3,8 +3,8 @@ kind: Notifier
 metadata:
   name: slack-test
 spec:
+  notifyInterval: 30 # seconds - by using requeueAfter
   slack:
     severity: "warning" # every channel has its default severity, but can be override by the rule
     channel: "your_channel"
     webhookURL: "your_webhook_url"
-

@@ -34,6 +34,11 @@ spec:
         spec:
           description: NotifierSpec defines the desired state of Notifier
           properties:
+            notifyInterval:
+              description: NotifyInterval is the interval for notifier to check and
+                sends notifications
+              format: int64
+              type: integer
             slack:
               description: Slack is the notifier for slack
               properties:
@@ -53,9 +58,43 @@ spec:
               - severity
               - webhookURL
               type: object
+          required:
+          - notifyInterval
           type: object
         status:
-          description: NotifierStatus defines the observed state of Notifier
+          description: 'NotifierStatus defines the observed state of Notifier, example:
+            CheckedAt: 2006-01-02T15:04:05Z07:00 Alerts:   ClusterRuleHPA/ResourceNamespacedName1:     Status:
+            firing     Message: <message>   ClusterRuleHPA/ResourceNamespacedName2:     Status:
+            pending     Message: <msg>'
+          properties:
+            alerts:
+              additionalProperties:
+                properties:
+                  error:
+                    description: Error is the err from any issues for sending message
+                      to external system
+                    type: string
+                  message:
+                    description: Message is the message for the alert, should contain
+                      {{.ResourceName}} as only variable.
+                    type: string
+                  status:
+                    description: Status is the status of this rule, can be pending,
+                      firing, or recovered
+                    type: string
+                required:
+                - error
+                - message
+                - status
+                type: object
+              description: Alerts are the map of alerts currently firing/pending for
+                objects violate the rule
+              type: object
+            checkedAt:
+              description: CheckedAt is the last check time of the notifier
+              type: string
+          required:
+          - checkedAt
           type: object
       type: object
   version: v1

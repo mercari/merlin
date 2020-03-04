@@ -65,16 +65,15 @@ var _ = BeforeSuite(func(done Done) {
 	err = merlinv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
+	err = merlinv1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
 	// +kubebuilder:scaffold:scheme
 
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{})
-	Expect(err).NotTo(HaveOccurred(), "failed to create manager")
+	Expect(err).NotTo(HaveOccurred())
 
-	hpaCtrl := &HorizontalPodAutoscalerReconciler{Client: mgr.GetClient(), Log: logf.Log, Scheme: mgr.GetScheme()}
-	Expect(hpaCtrl.SetupWithManager(mgr)).Should(Succeed(), "failed to setup hpa controller")
-
-	nsCtrl := &NamespaceReconciler{Client: mgr.GetClient(), Log: logf.Log, Scheme: mgr.GetScheme()}
-	Expect(nsCtrl.SetupWithManager(mgr)).Should(Succeed(), "failed to setup namespace controller")
+	Expect(SetupReconcilers(mgr)).Should(Succeed())
 
 	go func() {
 		Expect(mgr.Start(stopCh)).Should(Succeed(), "failed to start manager")

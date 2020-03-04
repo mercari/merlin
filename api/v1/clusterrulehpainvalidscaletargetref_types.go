@@ -21,7 +21,9 @@ import (
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -33,20 +35,16 @@ type ClusterRuleHPAInvalidScaleTargetRefSpec struct {
 	Notification Notification `json:"notification"`
 }
 
-// ClusterRuleHPAInvalidScaleTargetRefStatus defines the observed state of ClusterRuleHPAInvalidScaleTargetRef
-type ClusterRuleHPAInvalidScaleTargetRefStatus struct {
-}
-
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
 
-// ClusterRuleHPAInvalidScaleTargetRef is the Schema for the clusterrulehpainvalidscaletargetrefs API
+// ClusterRuleHPAInvalidScaleTargetRef is the Schema for the cluster rule hpa invalid scale target refs API
 type ClusterRuleHPAInvalidScaleTargetRef struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ClusterRuleHPAInvalidScaleTargetRefSpec   `json:"spec,omitempty"`
-	Status ClusterRuleHPAInvalidScaleTargetRefStatus `json:"status,omitempty"`
+	Spec   ClusterRuleHPAInvalidScaleTargetRefSpec `json:"spec,omitempty"`
+	Status RuleStatus                              `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -58,22 +56,78 @@ type ClusterRuleHPAInvalidScaleTargetRefList struct {
 	Items           []ClusterRuleHPAInvalidScaleTargetRef `json:"items"`
 }
 
-func (r ClusterRuleHPAInvalidScaleTargetRef) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource interface{}) *EvaluationResult {
+func (r ClusterRuleHPAInvalidScaleTargetRef) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource interface{}, notifiers map[string]*Notifier) error {
 	l.Info("Evaluating HPA ScaleTargetRef validity")
-	evaluationResult := &EvaluationResult{}
-	hpa, ok := resource.(autoscalingv1.HorizontalPodAutoscaler)
-	if !ok {
-		evaluationResult.Err = fmt.Errorf("unable to convert resource to hpa type")
-		return evaluationResult
+	var hpas autoscalingv1.HorizontalPodAutoscalerList
+	// cluster rule changed, check all HPA for new status
+	if resource == nil {
+		if err := cli.List(ctx, &hpas); err != nil {
+			if apierrs.IsNotFound(err) {
+				l.Info("No HPA found for evaluation", "rule", r.Name)
+				return nil
+			}
+			return err
+		}
+	} else {
+		hpa, ok := resource.(autoscalingv1.HorizontalPodAutoscaler)
+		if !ok {
+			return fmt.Errorf("unable to convert resource to hpa")
+		}
+		hpas.Items = append(hpas.Items, hpa)
 	}
+
+	for _, hpa := range hpas.Items {
+		l.Info("Checking hpa", "hpa", hpa.Name)
+		namespacedName := types.NamespacedName{Namespace: hpa.Namespace, Name: hpa.Name}
+		msg, err := r.Spec.Notification.ParseMessage(namespacedName, GetStructName(hpa), "HPA has invalid scale target ref")
+		if err != nil {
+			return err
+		}
+		isViolated, err := r.EvaluateHPA(ctx, cli, l, hpa)
+		if err != nil {
+			return err
+		}
+		// need to check if namespaced ignore here in case user added it into the list, in such case we need to remove it.
+		if isViolated && !IsStringInSlice(r.Spec.IgnoreNamespaces, hpa.Namespace) {
+			l.Info("resource has violation", "resource", namespacedName.String())
+			r.Status.AddViolation(namespacedName)
+			for _, n := range r.Spec.Notification.Notifiers {
+				notifier, ok := notifiers[n]
+				if !ok {
+					l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
+					continue
+				}
+				notifier.AddAlert(r.Kind, r.Name, namespacedName, msg)
+			}
+		} else {
+			r.Status.RemoveViolation(namespacedName)
+			for _, n := range r.Spec.Notification.Notifiers {
+				notifier, ok := notifiers[n]
+				if !ok {
+					l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
+					continue
+				}
+				notifier.RemoveAlert(r.Kind, r.Name, namespacedName, msg)
+			}
+		}
+	}
+
+	r.Status.SetCheckTime()
+	if err := cli.Update(ctx, &r); err != nil {
+		l.Error(err, "unable to update rule status", "rule", r.Name)
+		return err
+	}
+	return nil
+}
+
+func (r ClusterRuleHPAInvalidScaleTargetRef) EvaluateHPA(ctx context.Context, cli client.Client, l logr.Logger, hpa autoscalingv1.HorizontalPodAutoscaler) (isViolated bool, err error) {
 	match := false
 	switch hpa.Spec.ScaleTargetRef.Kind {
 	case "Deployment":
 		deployments := appsv1.DeploymentList{}
-		if err := cli.List(ctx, &deployments, &client.ListOptions{Namespace: hpa.Namespace}); client.IgnoreNotFound(err) != nil {
+		if err = cli.List(ctx, &deployments, &client.ListOptions{Namespace: hpa.Namespace}); client.IgnoreNotFound(err) != nil {
 			l.Error(err, "unable to list", "kind", deployments.Kind)
-			evaluationResult.Err = err
-			return evaluationResult
+			return
 		}
 		for _, d := range deployments.Items {
 			if d.Name == hpa.Spec.ScaleTargetRef.Name {
@@ -83,10 +137,9 @@ func (r ClusterRuleHPAInvalidScaleTargetRef) Evaluate(ctx context.Context, cli c
 		}
 	case "ReplicaSet":
 		replicaSets := appsv1.ReplicaSetList{}
-		if err := cli.List(ctx, &replicaSets, &client.ListOptions{Namespace: hpa.Namespace}); client.IgnoreNotFound(err) != nil {
+		if err = cli.List(ctx, &replicaSets, &client.ListOptions{Namespace: hpa.Namespace}); client.IgnoreNotFound(err) != nil {
 			l.Error(err, "unable to list", "kind", replicaSets.Kind)
-			evaluationResult.Err = err
-			return evaluationResult
+			return
 		}
 		for _, d := range replicaSets.Items {
 			if d.Name == hpa.Spec.ScaleTargetRef.Name {
@@ -95,16 +148,11 @@ func (r ClusterRuleHPAInvalidScaleTargetRef) Evaluate(ctx context.Context, cli c
 			}
 		}
 	default:
-		l.Info("Unknown HPA ScaleTargetRef kind", "kind", hpa.Spec.ScaleTargetRef.Kind, "name", hpa.Spec.ScaleTargetRef.Name)
+		err = fmt.Errorf("unknown HPA ScaleTargetRef kind")
+		l.Error(err, "kind", hpa.Spec.ScaleTargetRef.Kind, "name", hpa.Spec.ScaleTargetRef.Name)
+		return
 	}
-	if !match {
-		evaluationResult.Issues = append(evaluationResult.Issues, Issue{
-			Label:          IssueLabelInvalidScaleTargetRef,
-			DefaultMessage: "HPA ScaleTargetRef is incorrect",
-			Notification:   r.Spec.Notification,
-		})
-	}
-	return evaluationResult
+	return !match, nil
 }
 
 func init() {

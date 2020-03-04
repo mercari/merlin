@@ -17,13 +17,12 @@ package main
 
 import (
 	"flag"
-	"os"
-
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
 	"github.com/kouzoh/merlin/controllers"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	// +kubebuilder:scaffold:imports
@@ -63,30 +62,8 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
-
-	if err = (&controllers.PodReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("ctrl").WithName("Pod"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Pod")
-		os.Exit(1)
-	}
-	if err = (&controllers.HorizontalPodAutoscalerReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("ctrl").WithName("HPA"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "HPA")
-		os.Exit(1)
-	}
-	if err = (&controllers.NamespaceReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("ctrl").WithName("Namespace"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Namespace")
-		os.Exit(1)
+	if err := controllers.SetupReconcilers(mgr); err != nil {
+		setupLog.Error(err, "unable to setup reconcilers")
 	}
 	// +kubebuilder:scaffold:builder
 

@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -34,12 +36,6 @@ type ClusterRuleNamespaceRequiredLabelSpec struct {
 	Label RequiredLabel `json:"label"`
 }
 
-// ClusterRuleNamespaceRequiredLabelStatus defines the observed state of ClusterRuleNamespaceRequiredLabel
-type ClusterRuleNamespaceRequiredLabelStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-}
-
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
 
@@ -48,8 +44,8 @@ type ClusterRuleNamespaceRequiredLabel struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ClusterRuleNamespaceRequiredLabelSpec   `json:"spec,omitempty"`
-	Status ClusterRuleNamespaceRequiredLabelStatus `json:"status,omitempty"`
+	Spec   ClusterRuleNamespaceRequiredLabelSpec `json:"spec,omitempty"`
+	Status RuleStatus                            `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -61,28 +57,67 @@ type ClusterRuleNamespaceRequiredLabelList struct {
 	Items           []ClusterRuleNamespaceRequiredLabel `json:"items"`
 }
 
-func (r ClusterRuleNamespaceRequiredLabel) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource interface{}) *EvaluationResult {
-	l.Info("Evaluating HPA replica percentage", "name", r.Name)
-	evaluationResult := &EvaluationResult{}
-	namespace, ok := resource.(corev1.Namespace)
-	if !ok {
-		evaluationResult.Err = fmt.Errorf("unable to convert resource to type %s", corev1.Namespace{}.Kind)
-		return evaluationResult
-	}
-	issue, err := r.Spec.Label.Validate(namespace.GetLabels())
-	if err != nil {
-		evaluationResult.Err = err
-		return evaluationResult
+func (r ClusterRuleNamespaceRequiredLabel) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource interface{}, notifiers map[string]*Notifier) error {
+	l.Info("Evaluating Namespace required label", "name", r.Name)
+	var namespaces corev1.NamespaceList
+	// resource == nil is from rule changed, check resources for new status
+	if resource == nil {
+		if err := cli.List(ctx, &namespaces); err != nil {
+			if apierrs.IsNotFound(err) {
+				l.Info("No namespaces found for evaluation", "name", r.Name)
+				return nil
+			}
+			return err
+		}
+	} else {
+		namespace, ok := resource.(corev1.Namespace)
+		if !ok {
+			return fmt.Errorf("unable to convert resource to type %s", corev1.Namespace{}.Kind)
+		}
+		namespaces.Items = append(namespaces.Items, namespace)
 	}
 
-	if issue.Label != "" {
-		issue.Notification = r.Spec.Notification
-		evaluationResult.Issues = append(evaluationResult.Issues, issue)
+	for _, ns := range namespaces.Items {
+		namespacedName := types.NamespacedName{Namespace: ns.Namespace, Name: ns.Name}
+		violation, err := r.Spec.Label.Validate(ns.GetLabels())
+		if err != nil {
+			return err
+		}
+		msg, err := r.Spec.Notification.ParseMessage(namespacedName, GetStructName(ns), violation)
+		if err != nil {
+			return err
+		}
+		// need to check if namespaced ignore here in case user added it into the list, in such case we need to remove it.
+		if violation != "" && !IsStringInSlice(r.Spec.IgnoreNamespaces, ns.Name) {
+			l.Info("resource has violation", "resource", namespacedName.String())
+			r.Status.AddViolation(namespacedName)
+			for _, n := range r.Spec.Notification.Notifiers {
+				notifier, ok := notifiers[n]
+				if !ok {
+					l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
+					continue
+				}
+				notifier.AddAlert(r.Kind, r.Name, namespacedName, msg)
+			}
+		} else {
+			r.Status.RemoveViolation(namespacedName)
+			for _, n := range r.Spec.Notification.Notifiers {
+				notifier, ok := notifiers[n]
+				if !ok {
+					l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
+					continue
+				}
+				notifier.RemoveAlert(r.Kind, r.Name, namespacedName, msg)
+			}
+		}
 	}
-
-	return evaluationResult
+	r.Status.SetCheckTime()
+	if err := cli.Update(ctx, &r); err != nil {
+		l.Error(err, "unable to update rule status", "rule", r.Name)
+		return err
+	}
+	return nil
 }
-
 func init() {
 	SchemeBuilder.Register(&ClusterRuleNamespaceRequiredLabel{}, &ClusterRuleNamespaceRequiredLabelList{})
 }

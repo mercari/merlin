@@ -70,7 +70,7 @@ spec:
                     variables can be used are "ResourceName, Severity, and DefaultMessage"
                   type: string
                 notifiers:
-                  description: Notifiers is the list of notifiers for this notification
+                  description: NotifiersCache is the list of notifiers for this notification
                     to send
                   items:
                     type: string
@@ -91,8 +91,13 @@ spec:
           - notification
           type: object
         status:
-          description: ClusterRuleNamespaceRequiredLabelStatus defines the observed
-            state of ClusterRuleNamespaceRequiredLabel
+          properties:
+            checkedAt:
+              type: string
+            violations:
+              additionalProperties:
+                type: string
+              type: object
           type: object
       type: object
   version: v1

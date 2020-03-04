@@ -44,7 +44,7 @@ spec:
                     variables can be used are "ResourceName, Severity, and DefaultMessage"
                   type: string
                 notifiers:
-                  description: Notifiers is the list of notifiers for this notification
+                  description: NotifiersCache is the list of notifiers for this notification
                     to send
                   items:
                     type: string
@@ -85,8 +85,13 @@ spec:
           - selector
           type: object
         status:
-          description: RuleHPAReplicaPercentageStatus defines the observed state of
-            RuleHPAReplicaPercentage
+          properties:
+            checkedAt:
+              type: string
+            violations:
+              additionalProperties:
+                type: string
+              type: object
           type: object
       type: object
   version: v1

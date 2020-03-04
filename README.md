@@ -25,7 +25,7 @@ make uninstall
 Once CRDs are installed, you can start setting what rules you'd like to have, there are several samples under `config/samples`, 
 you can run 
 ```bash
-kubectl apply-samples
+make apply-samples
 ```
 to apply all sample resources
 
