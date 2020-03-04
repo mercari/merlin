@@ -138,7 +138,17 @@ func (n *Notifier) AddAlert(ruleKind, ruleName string, objectNamespacedName type
 	if n.Status.Alerts == nil {
 		n.Status.Alerts = map[string]Alert{}
 	}
-	n.Status.Alerts[alertName] = Alert{Message: message, Status: AlertStatusPending}
+	if alert, ok := n.Status.Alerts[alertName]; !ok {
+		n.Status.Alerts[alertName] = Alert{Message: message, Status: AlertStatusPending}
+	} else {
+		switch alert.Status {
+		case AlertStatusFiring, AlertStatusPending, AlertStatusError:
+			// do nothing
+		case AlertStatusRecovering:
+			// recovering alert gets fired again, set them back to firing.
+			n.Status.Alerts[alertName] = Alert{Message: message, Status: AlertStatusFiring}
+		}
+	}
 }
 
 func (n *Notifier) RemoveAlert(ruleKind, ruleName string, objectNamespacedName types.NamespacedName, message string) {
