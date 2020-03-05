@@ -1,0 +1,9 @@
+config/certmanager/** linguist-generated=true
+config/crd/patches/** linguist-generated=true
+config/crd/*.yaml linguist-generated=true
+config/default/** linguist-generated=true
+config/manager/** linguist-generated=true
+config/prometheus/** linguist-generated=true
+config/rbac/** linguist-generated=true
+config/webhook/** linguist-generated=true
+api/v1/zz_generated.deepcopy.go linguist-generated=true
