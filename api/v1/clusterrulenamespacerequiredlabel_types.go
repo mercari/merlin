@@ -37,6 +37,15 @@ type ClusterRuleNamespaceRequiredLabelSpec struct {
 }
 
 // +kubebuilder:object:root=true
+
+// ClusterRuleNamespaceRequiredLabelList contains a list of ClusterRuleNamespaceRequiredLabel
+type ClusterRuleNamespaceRequiredLabelList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []ClusterRuleNamespaceRequiredLabel `json:"items"`
+}
+
+// +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
 
 // ClusterRuleNamespaceRequiredLabel is the Schema for the clusterrulenamespacerequiredlabels API
@@ -46,15 +55,6 @@ type ClusterRuleNamespaceRequiredLabel struct {
 
 	Spec   ClusterRuleNamespaceRequiredLabelSpec `json:"spec,omitempty"`
 	Status RuleStatus                            `json:"status,omitempty"`
-}
-
-// +kubebuilder:object:root=true
-
-// ClusterRuleNamespaceRequiredLabelList contains a list of ClusterRuleNamespaceRequiredLabel
-type ClusterRuleNamespaceRequiredLabelList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ClusterRuleNamespaceRequiredLabel `json:"items"`
 }
 
 func (r ClusterRuleNamespaceRequiredLabel) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource interface{}, notifiers map[string]*Notifier) error {
@@ -118,6 +118,11 @@ func (r ClusterRuleNamespaceRequiredLabel) Evaluate(ctx context.Context, cli cli
 	}
 	return nil
 }
+
+func (r ClusterRuleNamespaceRequiredLabel) GetStatus() RuleStatus {
+	return r.Status
+}
+
 func init() {
 	SchemeBuilder.Register(&ClusterRuleNamespaceRequiredLabel{}, &ClusterRuleNamespaceRequiredLabelList{})
 }

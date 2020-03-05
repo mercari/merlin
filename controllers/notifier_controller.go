@@ -17,12 +17,10 @@ package controllers
 
 import (
 	"context"
-	"github.com/go-logr/logr"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sync"
 	"time"
 
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
@@ -30,11 +28,7 @@ import (
 
 // NotifierReconciler reconciles a Notifier object
 type NotifierReconciler struct {
-	client.Client
-	Log            logr.Logger
-	Scheme         *runtime.Scheme
-	NotifiersCache map[string]*merlinv1.Notifier
-	Generations    map[string]int64
+	Reconciler
 }
 
 // +kubebuilder:rbac:groups=merlin.mercari.com,resources=notifis,verbs=get;list;watch;create;update;patch;delete
@@ -54,10 +48,11 @@ func (r *NotifierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{RequeueAfter: RequeueIntervalForError}, err
 	}
 
-	notifierCache, ok := r.NotifiersCache[req.Name]
+	notifierCache, ok := r.Notifiers[req.Name]
 	if !ok { // new notifier is created, just add to cache and waits for next iteration to send notifications.
+		l.Info("New notifier is created", "notifier", req.Name)
 		notifier.Status = merlinv1.NotifierStatus{Alerts: map[string]merlinv1.Alert{}}
-		r.NotifiersCache[req.Name] = &notifier
+		r.Notifiers[req.Name] = &notifier
 		return ctrl.Result{RequeueAfter: time.Second * time.Duration(notifier.Spec.NotifyInterval)}, nil
 	}
 
@@ -65,7 +60,7 @@ func (r *NotifierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	notifierCache.Notify()
 	notifier.Status = notifierCache.Status
 
-	r.Generations[notifier.Name] = notifier.Generation + 1
+	r.Generations.Store(notifier.Name, notifier.Generation+1)
 	if err := r.Client.Update(ctx, &notifier); err != nil {
 		l.Error(err, "unable to update status")
 		return ctrl.Result{RequeueAfter: RequeueIntervalForError}, err
@@ -75,8 +70,8 @@ func (r *NotifierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 func (r *NotifierReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	l := r.Log.WithName("SetupWithManager")
-	r.NotifiersCache = map[string]*merlinv1.Notifier{}
-	r.Generations = map[string]int64{}
+	r.Notifiers = map[string]*merlinv1.Notifier{}
+	r.Generations = &sync.Map{}
 	l.Info("initialize manager")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&merlinv1.Notifier{}).

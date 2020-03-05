@@ -38,6 +38,15 @@ type RuleHPAReplicaPercentageSpec struct {
 
 // +kubebuilder:object:root=true
 
+// RuleHPAReplicaPercentageList contains a list of RuleHPAReplicaPercentage
+type RuleHPAReplicaPercentageList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []RuleHPAReplicaPercentage `json:"items"`
+}
+
+// +kubebuilder:object:root=true
+
 // RuleHPAReplicaPercentage is the Schema for the rulehpareplicapercentage API
 type RuleHPAReplicaPercentage struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -45,15 +54,6 @@ type RuleHPAReplicaPercentage struct {
 
 	Spec   RuleHPAReplicaPercentageSpec `json:"spec,omitempty"`
 	Status RuleStatus                   `json:"status,omitempty"`
-}
-
-// +kubebuilder:object:root=true
-
-// RuleHPAReplicaPercentageList contains a list of RuleHPAReplicaPercentage
-type RuleHPAReplicaPercentageList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []RuleHPAReplicaPercentage `json:"items"`
 }
 
 func (r RuleHPAReplicaPercentage) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource interface{}, notifiers map[string]*Notifier) error {
@@ -110,6 +110,10 @@ func (r RuleHPAReplicaPercentage) Evaluate(ctx context.Context, cli client.Clien
 		return err
 	}
 	return nil
+}
+
+func (r RuleHPAReplicaPercentage) GetStatus() RuleStatus {
+	return r.Status
 }
 
 func init() {

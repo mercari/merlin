@@ -18,7 +18,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"github.com/go-logr/logr"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,21 +26,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	"strings"
+	"sync"
 
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
 )
 
 // HorizontalPodAutoscalerReconciler reconciles a HorizontalPodAutoscaler object
 type HorizontalPodAutoscalerReconciler struct {
-	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
-	// Notifiers stores the notifiers as cache, this will be updated when any notifier updates happen,
-	// and also servers as cache so we dont need to get list of notifiers every time
-	Notifiers map[string]*merlinv1.Notifier
-	// Generations stores the rule generation, to be used for event filter to determine if events are from Reconciler
-	// This is required since status updates also increases generation, so we cant use metadata's generation.
-	Generations map[string]int64
+	Reconciler
 }
 
 // +kubebuilder:rbac:groups=merlin.mercari.com,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
@@ -91,28 +83,21 @@ func (r *HorizontalPodAutoscalerReconciler) Reconcile(req ctrl.Request) (ctrl.Re
 			// TODO: resource is deleted, clear all alerts
 			return ctrl.Result{}, nil
 		}
+		if _, ok := r.RuleStatues[rule.GetName()]; !ok {
+			r.RuleStatues[rule.GetName()] = &RuleStatusWithLock{}
+		}
+		r.RuleStatues[rule.GetName()].Lock()
 		if err := rule.Evaluate(ctx, r.Client, l, nil, r.Notifiers); err != nil {
 			return ctrl.Result{}, err
 		}
-		r.Generations[rule.GetName()] = rule.GetGeneration() + 1
+		r.Generations.Store(rule.GetName(), rule.GetGeneration()+1)
+		r.RuleStatues[rule.GetName()].RuleStatus = rule.GetStatus()
+		r.RuleStatues[rule.GetName()].Unlock()
 		return ctrl.Result{}, nil
 	}
 	l = l.WithValues("hpa", req.NamespacedName)
 	hpa := autoscalingv1.HorizontalPodAutoscaler{}
 	if err := r.Client.Get(ctx, req.NamespacedName, &hpa); client.IgnoreNotFound(err) != nil {
-		return ctrl.Result{}, err
-	}
-
-	// update annotations
-	annotations := map[string]string{}
-	for k, v := range hpa.GetAnnotations() {
-		if k != AnnotationCheckedTime && k != AnnotationIssue {
-			annotations[k] = v
-		}
-	}
-	hpa.SetAnnotations(annotations)
-	if err := r.Update(ctx, &hpa); err != nil {
-		l.Error(err, "unable to update annotations")
 		return ctrl.Result{}, err
 	}
 
@@ -130,9 +115,16 @@ func (r *HorizontalPodAutoscalerReconciler) Reconcile(req ctrl.Request) (ctrl.Re
 	// running evaluation and combine results
 	l.Info("Evaluating HPA")
 	for _, rule := range rulesToApply {
+		if _, ok := r.RuleStatues[rule.GetName()]; !ok {
+			r.RuleStatues[rule.GetName()] = &RuleStatusWithLock{}
+		}
+		r.RuleStatues[rule.GetName()].Lock()
 		if err := rule.Evaluate(ctx, r.Client, l, hpa, r.Notifiers); err != nil {
 			return ctrl.Result{}, err
 		}
+		r.Generations.Store(rule.GetName(), rule.GetGeneration()+1)
+		r.RuleStatues[rule.GetName()].RuleStatus = rule.GetStatus()
+		r.RuleStatues[rule.GetName()].Unlock()
 	}
 
 	return ctrl.Result{}, nil
@@ -140,7 +132,8 @@ func (r *HorizontalPodAutoscalerReconciler) Reconcile(req ctrl.Request) (ctrl.Re
 
 func (r *HorizontalPodAutoscalerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	l := r.Log.WithName("SetupWithManager")
-	r.Generations = map[string]int64{}
+	r.Generations = &sync.Map{}
+	r.RuleStatues = map[string]*RuleStatusWithLock{}
 
 	if err := mgr.GetFieldIndexer().IndexField(&merlinv1.ClusterRuleHPAInvalidScaleTargetRef{}, indexField, func(rawObj runtime.Object) []string {
 		obj := rawObj.(*merlinv1.ClusterRuleHPAInvalidScaleTargetRef)
@@ -186,7 +179,7 @@ func (r *HorizontalPodAutoscalerReconciler) SetupWithManager(mgr ctrl.Manager) e
 		Watches(
 			&source.Kind{Type: &merlinv1.RuleHPAReplicaPercentage{}},
 			&EventHandler{Log: l, Kind: GetStructName(merlinv1.RuleHPAReplicaPercentage{}), ObjectGenerations: r.Generations}).
-		WithEventFilter(GetPredicateFuncs(l, nil)).
+		WithEventFilter(GetPredicateFuncs(l, &sync.Map{})).
 		Named(autoscalingv1.HorizontalPodAutoscaler{}.Kind).
 		Complete(r)
 }

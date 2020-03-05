@@ -6,6 +6,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sync"
 )
 
 // EventHandler determine how events should be handled. Kubernetes first uses EventFilter then hands off those events to this handler
@@ -15,7 +16,7 @@ type EventHandler struct {
 	// Kind is object kind which associated with the event
 	Kind string
 	// ObjectGenerations stores the object's generation, used to compare if the update is from reconcile or user/k8s update
-	ObjectGenerations map[string]int64
+	ObjectGenerations *sync.Map
 }
 
 const Separator = string(types.Separator)
@@ -28,9 +29,8 @@ func (e *EventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInt
 		"old resource version", evt.MetaOld.GetResourceVersion(),
 		"new generation", evt.MetaNew.GetGeneration(),
 		"new resource version", evt.MetaNew.GetResourceVersion(),
-		"generations cache", e.ObjectGenerations[evt.MetaNew.GetName()],
 	)
-	gen, ok := e.ObjectGenerations[evt.MetaNew.GetName()]
+	gen, ok := e.ObjectGenerations.Load(evt.MetaNew.GetName())
 	if ok && evt.MetaNew.GetGeneration() == gen {
 		e.Log.Info("same generation as ObjectGenerations, event is from status updates.")
 		return

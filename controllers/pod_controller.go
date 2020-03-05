@@ -18,26 +18,14 @@ package controllers
 import (
 	"context"
 
-	"github.com/go-logr/logr"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	corev1 "k8s.io/api/core/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 // PodReconciler reconciles a Pod object
 type PodReconciler struct {
-	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
-	// Notifiers stores the notifiers as cache, this will be updated when any notifier updates happen,
-	// and also servers as cache so we dont need to get list of notifiers every time
-	Notifiers map[string]*merlinv1.Notifier
-	// Generations stores the rule generation, to be used for event filter to determine if events are from Reconciler
-	// This is required since status updates also increases generation, so we cant use metadata's generation.
-	Generations map[string]int64
+	Reconciler
 }
 
 // +kubebuilder:rbac:groups=merlin.mercari.com,resources=pods,verbs=get;list;watch;create;update;patch;delete

@@ -38,7 +38,7 @@ var _ = Describe("HPAControllerTests", func() {
 		})).Should(Succeed(), "Failed to apply cluster rule")
 		By("test notifier should be added into notifier reconciler's cache")
 		Eventually(func() bool {
-			_, ok := notifierReconciler.NotifiersCache[notifierName]
+			_, ok := notifierReconciler.Notifiers[notifierName]
 			return ok
 		}, time.Second*2, time.Millisecond*200).Should(Equal(true))
 	})
@@ -47,7 +47,7 @@ var _ = Describe("HPAControllerTests", func() {
 		testMsg := "test alert message"
 		testResourceName := types.NamespacedName{Name: "testresource"}
 		alertKey := ruleKind + Separator + ruleName + Separator + testResourceName.String()
-		notifier := notifierReconciler.NotifiersCache[notifierName]
+		notifier := notifierReconciler.Notifiers[notifierName]
 		notifier.AddAlert(ruleKind, ruleName, testResourceName, testMsg)
 		By("Notifier should have the status")
 		alert, ok := notifier.Status.Alerts[alertKey]

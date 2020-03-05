@@ -17,6 +17,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
 	"github.com/kouzoh/merlin/controllers"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,6 +42,8 @@ func init() {
 }
 
 func main() {
+	path, _ := os.Executable()
+	fmt.Printf("Program starting at %s \n", path)
 	var metricsAddr string
 	var enableLeaderElection bool
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")

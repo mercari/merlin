@@ -28,6 +28,7 @@ const (
 type Rule interface {
 	Evaluate(ctx context.Context, cli client.Client, log logr.Logger, resource interface{}, notifiers map[string]*Notifier) error
 	GetName() string
+	GetStatus() RuleStatus
 	GetGeneration() int64
 	GetObjectKind() schema.ObjectKind
 	DeepCopyObject() runtime.Object
@@ -46,11 +47,11 @@ type RequiredLabel struct {
 func (r RequiredLabel) Validate(labels map[string]string) (violation string, err error) {
 	v, ok := labels[r.Key]
 	if !ok {
-		return fmt.Sprintf("resource doenst have required label %s", r.Key), nil
+		return fmt.Sprintf("doenst have required label %s", r.Key), nil
 	}
 	if r.Match == "" || r.Match == "exact" {
 		if v != r.Value {
-			return fmt.Sprintf("resource has incorrect label value %s (expect %s) for label %s", v, r.Value, r.Key), nil
+			return fmt.Sprintf("has incorrect label value %s (expect %s) for label %s", v, r.Value, r.Key), nil
 		}
 	} else if r.Match == "regexp" {
 		var re *regexp.Regexp
@@ -59,7 +60,7 @@ func (r RequiredLabel) Validate(labels map[string]string) (violation string, err
 			return
 		}
 		if len(re.FindAllString(v, -1)) <= 0 {
-			return fmt.Sprintf("Namespace has incorrect label value %s (regex match %s) for label %s", v, r.Value, r.Key), nil
+			return fmt.Sprintf("has incorrect label value %s (regex match %s) for label %s", v, r.Value, r.Key), nil
 		}
 	}
 	return

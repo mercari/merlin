@@ -18,7 +18,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,21 +26,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	"strings"
+	"sync"
 
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
 )
 
 // NamespaceReconciler reconciles a Namespace object
 type NamespaceReconciler struct {
-	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
-	// Notifiers stores the notifiers as cache, this will be updated when any notifier updates happen,
-	// and also servers as cache so we dont need to get list of notifiers every time
-	Notifiers map[string]*merlinv1.Notifier
-	// Generations stores the rule generation, to be used for event filter to determine if events are from Reconciler
-	// This is required since status updates also increases generation, so we cant use metadata's generation.
-	Generations map[string]int64
+	Reconciler
 }
 
 // +kubebuilder:rbac:groups=merlin.mercari.com,resources=namespaces,verbs=get;list;watch;create;update;patch;delete
@@ -74,10 +66,16 @@ func (r *NamespaceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			// TODO: resource is deleted, clear all alerts
 			return ctrl.Result{}, nil
 		}
+		if _, ok := r.RuleStatues[rule.GetName()]; !ok {
+			r.RuleStatues[rule.GetName()] = &RuleStatusWithLock{}
+		}
+		r.RuleStatues[rule.GetName()].Lock()
 		if err := rule.Evaluate(ctx, r.Client, l, nil, r.Notifiers); err != nil {
 			return ctrl.Result{}, err
 		}
-		r.Generations[rule.GetName()] = rule.GetGeneration() + 1
+		r.Generations.Store(rule.GetName(), rule.GetGeneration()+1)
+		r.RuleStatues[rule.GetName()].RuleStatus = rule.GetStatus()
+		r.RuleStatues[rule.GetName()].Unlock()
 		return ctrl.Result{}, nil
 	}
 
@@ -102,9 +100,16 @@ func (r *NamespaceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// running evaluation and combine results
 	l.Info("Evaluating namespace")
 	for _, rule := range rulesToApply {
+		if _, ok := r.RuleStatues[rule.GetName()]; !ok {
+			r.RuleStatues[rule.GetName()] = &RuleStatusWithLock{}
+		}
+		r.RuleStatues[rule.GetName()].Lock()
 		if err := rule.Evaluate(ctx, r.Client, l, namespace, r.Notifiers); err != nil {
 			return ctrl.Result{}, err
 		}
+		r.Generations.Store(rule.GetName(), rule.GetGeneration()+1)
+		r.RuleStatues[rule.GetName()].RuleStatus = rule.GetStatus()
+		r.RuleStatues[rule.GetName()].Unlock()
 	}
 
 	return ctrl.Result{}, nil
@@ -112,7 +117,8 @@ func (r *NamespaceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 func (r *NamespaceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	l := r.Log.WithName("SetupWithManager")
-	r.Generations = map[string]int64{}
+	r.Generations = &sync.Map{}
+	r.RuleStatues = map[string]*RuleStatusWithLock{}
 
 	if err := mgr.GetFieldIndexer().IndexField(&merlinv1.ClusterRuleNamespaceRequiredLabel{}, indexField, func(rawObj runtime.Object) []string {
 		obj := rawObj.(*merlinv1.ClusterRuleNamespaceRequiredLabel)
@@ -136,7 +142,7 @@ func (r *NamespaceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&source.Kind{Type: &merlinv1.ClusterRuleNamespaceRequiredLabel{}},
 			&EventHandler{Log: l, Kind: GetStructName(merlinv1.ClusterRuleNamespaceRequiredLabel{}), ObjectGenerations: r.Generations}).
-		WithEventFilter(GetPredicateFuncs(l, nil)).
+		WithEventFilter(GetPredicateFuncs(l, &sync.Map{})).
 		Named(corev1.Namespace{}.Kind).
 		Complete(r)
 }

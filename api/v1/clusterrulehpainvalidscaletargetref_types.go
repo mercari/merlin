@@ -36,6 +36,15 @@ type ClusterRuleHPAInvalidScaleTargetRefSpec struct {
 }
 
 // +kubebuilder:object:root=true
+
+// ClusterRuleHPAInvalidScaleTargetRefList contains a list of ClusterRuleHPAInvalidScaleTargetRef
+type ClusterRuleHPAInvalidScaleTargetRefList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []ClusterRuleHPAInvalidScaleTargetRef `json:"items"`
+}
+
+// +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
 
 // ClusterRuleHPAInvalidScaleTargetRef is the Schema for the cluster rule hpa invalid scale target refs API
@@ -45,15 +54,6 @@ type ClusterRuleHPAInvalidScaleTargetRef struct {
 
 	Spec   ClusterRuleHPAInvalidScaleTargetRefSpec `json:"spec,omitempty"`
 	Status RuleStatus                              `json:"status,omitempty"`
-}
-
-// +kubebuilder:object:root=true
-
-// ClusterRuleHPAInvalidScaleTargetRefList contains a list of ClusterRuleHPAInvalidScaleTargetRef
-type ClusterRuleHPAInvalidScaleTargetRefList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ClusterRuleHPAInvalidScaleTargetRef `json:"items"`
 }
 
 func (r ClusterRuleHPAInvalidScaleTargetRef) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource interface{}, notifiers map[string]*Notifier) error {
@@ -153,6 +153,10 @@ func (r ClusterRuleHPAInvalidScaleTargetRef) EvaluateHPA(ctx context.Context, cl
 		return
 	}
 	return !match, nil
+}
+
+func (r ClusterRuleHPAInvalidScaleTargetRef) GetStatus() RuleStatus {
+	return r.Status
 }
 
 func init() {

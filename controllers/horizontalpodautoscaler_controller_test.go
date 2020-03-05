@@ -22,9 +22,24 @@ var _ = Describe("HPAControllerTests", func() {
 	var ctx = context.Background()
 
 	Context("TestClusterRuleHPAInvalidScaleTargetRef", func() {
-		var notifierName = strings.ToLower("HPAControllerTests") + "-notifier"
-		var testNotifierCreated = false
-		const ruleName = "test-hpa-cluster-rule"
+		var ruleStructName = GetStructName(merlinv1.ClusterRuleHPAInvalidScaleTargetRef{})
+		var isNotifierCreated = false
+		var notifier = &merlinv1.Notifier{
+			ObjectMeta: metav1.ObjectMeta{Name: strings.ToLower(ruleStructName) + "-notifier"},
+			Spec:       merlinv1.NotifierSpec{NotifyInterval: 1},
+		}
+		var rule = &merlinv1.ClusterRuleHPAInvalidScaleTargetRef{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-hpa-cluster-rule",
+			},
+			Spec: merlinv1.ClusterRuleHPAInvalidScaleTargetRefSpec{
+				IgnoreNamespaces: []string{},
+				Notification: merlinv1.Notification{
+					Notifiers: []string{notifier.Name},
+				},
+			},
+		}
+
 		min := int32(2)
 		hpa := &autoscalingv1.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{
@@ -42,17 +57,17 @@ var _ = Describe("HPAControllerTests", func() {
 			},
 		}
 		hpaNamespacedName := types.NamespacedName{Namespace: hpa.Namespace, Name: hpa.Name}
-		alertKey := "ClusterRuleHPAInvalidScaleTargetRef" + Separator + ruleName + Separator + hpaNamespacedName.String()
+		alertKey := strings.Join([]string{ruleStructName, rule.Name, hpaNamespacedName.String()}, Separator)
 
 		BeforeEach(func() {
 			logf.Log.Info("Running test", "test", CurrentGinkgoTestDescription().FullTestText)
-			if !testNotifierCreated {
-				Expect(k8sClient.Create(ctx, &merlinv1.Notifier{
-					ObjectMeta: metav1.ObjectMeta{Name: notifierName},
-					Spec:       merlinv1.NotifierSpec{NotifyInterval: 1},
-				})).Should(Succeed())
+			if !isNotifierCreated {
+				Expect(k8sClient.Create(ctx, notifier)).Should(Succeed())
+				Eventually(func() map[string]*merlinv1.Notifier {
+					return notifierReconciler.Notifiers
+				}, time.Second*5, time.Millisecond*200).Should(HaveKey(notifier.Name))
 			}
-			testNotifierCreated = true
+			isNotifierCreated = true
 		})
 
 		It("TestApplyEmptyClusterRuleHPAInvalidScaleTargetRef", func() {
@@ -68,31 +83,21 @@ var _ = Describe("HPAControllerTests", func() {
 		})
 
 		It("TestApplyClusterRuleHPAInvalidScaleTargetRef", func() {
-			Expect(k8sClient.Create(ctx, &merlinv1.ClusterRuleHPAInvalidScaleTargetRef{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: ruleName,
-				},
-				Spec: merlinv1.ClusterRuleHPAInvalidScaleTargetRefSpec{
-					IgnoreNamespaces: []string{},
-					Notification: merlinv1.Notification{
-						Notifiers: []string{notifierName},
-					},
-				},
-			})).Should(Succeed(), "Failed to apply cluster rule")
+			Expect(k8sClient.Create(ctx, rule)).Should(Succeed(), "Failed to apply cluster rule")
 		})
 
 		It("TestCreateInvalidHPAShouldGetViolations", func() {
 			Expect(k8sClient.Create(ctx, hpa)).Should(Succeed(), "Failed to create hpa")
 			Eventually(func() map[string]string {
 				r := &merlinv1.ClusterRuleHPAInvalidScaleTargetRef{}
-				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: ruleName}, r)).Should(Succeed())
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: rule.Name}, r)).Should(Succeed())
 				return r.Status.Violations
 			}, time.Second*3, time.Millisecond*200).Should(HaveKey(hpaNamespacedName.String()))
 			// alert should be added to notifier status
-			Expect(notifierReconciler.NotifiersCache[notifierName].Status.Alerts).Should(HaveKey(alertKey))
+			Expect(notifierReconciler.Notifiers[notifier.Name].Status.Alerts).Should(HaveKey(alertKey))
 			Eventually(func() map[string]merlinv1.Alert {
 				n := &merlinv1.Notifier{}
-				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifierName}, n)).Should(Succeed())
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).Should(HaveKey(alertKey))
 		})
@@ -124,16 +129,16 @@ var _ = Describe("HPAControllerTests", func() {
 			// violation should be removed from rule status
 			Eventually(func() map[string]string {
 				r := &merlinv1.ClusterRuleHPAInvalidScaleTargetRef{}
-				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: ruleName}, r)).Should(Succeed())
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: rule.Name}, r)).Should(Succeed())
 				return r.Status.Violations
 			}, time.Second*5, time.Millisecond*200).ShouldNot(HaveKey(hpaNamespacedName.String()))
 			// alert should be removed from notifier status
 			Eventually(func() map[string]merlinv1.Alert {
 				n := &merlinv1.Notifier{}
-				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifierName}, n)).Should(Succeed())
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).ShouldNot(HaveKey(alertKey))
-			Expect(notifierReconciler.NotifiersCache[notifierName].Status.Alerts).ShouldNot(HaveKey(alertKey))
+			Expect(notifierReconciler.Notifiers[notifier.Name].Status.Alerts).ShouldNot(HaveKey(alertKey))
 		})
 	})
 })

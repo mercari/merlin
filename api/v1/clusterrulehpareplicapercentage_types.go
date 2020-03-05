@@ -37,6 +37,15 @@ type ClusterRuleHPAReplicaPercentageSpec struct {
 }
 
 // +kubebuilder:object:root=true
+
+// ClusterRuleHPAReplicaPercentageList contains a list of ClusterRuleHPAReplicaPercentage
+type ClusterRuleHPAReplicaPercentageList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []ClusterRuleHPAReplicaPercentage `json:"items"`
+}
+
+// +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
 
 // ClusterRuleHPAReplicaPercentage is the Schema for the cluster rule hpa replica percentages API
@@ -46,15 +55,6 @@ type ClusterRuleHPAReplicaPercentage struct {
 
 	Spec   ClusterRuleHPAReplicaPercentageSpec `json:"spec,omitempty"`
 	Status RuleStatus                          `json:"status,omitempty"`
-}
-
-// +kubebuilder:object:root=true
-
-// ClusterRuleHPAReplicaPercentageList contains a list of ClusterRuleHPAReplicaPercentage
-type ClusterRuleHPAReplicaPercentageList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ClusterRuleHPAReplicaPercentage `json:"items"`
 }
 
 func (r ClusterRuleHPAReplicaPercentage) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource interface{}, notifiers map[string]*Notifier) error {
@@ -112,6 +112,10 @@ func (r ClusterRuleHPAReplicaPercentage) Evaluate(ctx context.Context, cli clien
 		return err
 	}
 	return nil
+}
+
+func (r ClusterRuleHPAReplicaPercentage) GetStatus() RuleStatus {
+	return r.Status
 }
 
 func init() {
