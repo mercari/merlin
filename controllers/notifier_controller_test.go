@@ -48,7 +48,7 @@ var _ = Describe("HPAControllerTests", func() {
 		testResourceName := types.NamespacedName{Name: "testresource"}
 		alertKey := ruleKind + Separator + ruleName + Separator + testResourceName.String()
 		notifier := notifierReconciler.Notifiers[notifierName]
-		notifier.AddAlert(ruleKind, ruleName, testResourceName, testMsg)
+		notifier.SetAlert(ruleKind, ruleName, testResourceName, testMsg, true)
 		By("Notifier should have the status")
 		alert, ok := notifier.Status.Alerts[alertKey]
 		Expect(ok).To(Equal(true))

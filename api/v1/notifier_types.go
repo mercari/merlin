@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -133,31 +134,27 @@ func (n *Notifier) Notify() {
 
 }
 
-func (n *Notifier) AddAlert(ruleKind, ruleName string, objectNamespacedName types.NamespacedName, message string) {
-	alertName := ruleKind + Separator + ruleName + Separator + objectNamespacedName.String()
+func (n *Notifier) SetAlert(ruleKind, ruleName string, objectNamespacedName types.NamespacedName, message string, isViolated bool) {
+	alertName := strings.Join([]string{ruleKind, ruleName, objectNamespacedName.String()}, Separator)
 	if n.Status.Alerts == nil {
 		n.Status.Alerts = map[string]Alert{}
 	}
-	if alert, ok := n.Status.Alerts[alertName]; !ok {
-		n.Status.Alerts[alertName] = Alert{Message: message, Status: AlertStatusPending}
-	} else {
-		switch alert.Status {
-		case AlertStatusFiring, AlertStatusPending, AlertStatusError:
-			// do nothing
-		case AlertStatusRecovering:
-			// recovering alert gets fired again, set them back to firing.
-			n.Status.Alerts[alertName] = Alert{Message: message, Status: AlertStatusFiring}
+	if isViolated {
+		if alert, ok := n.Status.Alerts[alertName]; !ok {
+			n.Status.Alerts[alertName] = Alert{Message: message, Status: AlertStatusPending}
+		} else {
+			switch alert.Status {
+			case AlertStatusFiring, AlertStatusPending, AlertStatusError:
+				// do nothing
+			case AlertStatusRecovering:
+				// recovering alert gets fired again, set them back to firing.
+				n.Status.Alerts[alertName] = Alert{Message: message, Status: AlertStatusFiring}
+			}
 		}
-	}
-}
-
-func (n *Notifier) RemoveAlert(ruleKind, ruleName string, objectNamespacedName types.NamespacedName, message string) {
-	alertName := ruleKind + Separator + ruleName + Separator + objectNamespacedName.String()
-	if n.Status.Alerts == nil {
-		n.Status.Alerts = map[string]Alert{}
-	}
-	if _, ok := n.Status.Alerts[alertName]; ok {
-		n.Status.Alerts[alertName] = Alert{Message: "[recovered]" + message, Status: AlertStatusRecovering}
+	} else {
+		if _, ok := n.Status.Alerts[alertName]; ok {
+			n.Status.Alerts[alertName] = Alert{Message: "[recovered]" + message, Status: AlertStatusRecovering}
+		}
 	}
 }
 

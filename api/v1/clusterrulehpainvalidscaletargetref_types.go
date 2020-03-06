@@ -83,36 +83,27 @@ func (r ClusterRuleHPAInvalidScaleTargetRef) Evaluate(ctx context.Context, cli c
 		if err != nil {
 			return err
 		}
-		isViolated, err := r.EvaluateHPA(ctx, cli, l, hpa)
+		hasMatch, err := r.HPAHasMatch(ctx, cli, l, hpa)
 		if err != nil {
 			return err
 		}
-		// need to check if namespaced ignore here in case user added it into the list, in such case we need to remove it.
-		if isViolated && !IsStringInSlice(r.Spec.IgnoreNamespaces, hpa.Namespace) {
+
+		isViolated := false
+		if !hasMatch && !IsStringInSlice(r.Spec.IgnoreNamespaces, hpa.Namespace) {
 			l.Info("resource has violation", "resource", namespacedName.String())
-			r.Status.AddViolation(namespacedName)
-			for _, n := range r.Spec.Notification.Notifiers {
-				notifier, ok := notifiers[n]
-				if !ok {
-					l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
-					continue
-				}
-				notifier.AddAlert(r.Kind, r.Name, namespacedName, msg)
+			isViolated = true
+		}
+		r.Status.SetViolation(namespacedName, isViolated)
+		for _, n := range r.Spec.Notification.Notifiers {
+			notifier, ok := notifiers[n]
+			if !ok {
+				l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
+				continue
 			}
-		} else {
-			r.Status.RemoveViolation(namespacedName)
-			for _, n := range r.Spec.Notification.Notifiers {
-				notifier, ok := notifiers[n]
-				if !ok {
-					l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
-					continue
-				}
-				notifier.RemoveAlert(r.Kind, r.Name, namespacedName, msg)
-			}
+			notifier.SetAlert(r.Kind, r.Name, namespacedName, msg, isViolated)
 		}
 	}
 
-	r.Status.SetCheckTime()
 	if err := cli.Update(ctx, &r); err != nil {
 		l.Error(err, "unable to update rule status", "rule", r.Name)
 		return err
@@ -120,7 +111,7 @@ func (r ClusterRuleHPAInvalidScaleTargetRef) Evaluate(ctx context.Context, cli c
 	return nil
 }
 
-func (r ClusterRuleHPAInvalidScaleTargetRef) EvaluateHPA(ctx context.Context, cli client.Client, l logr.Logger, hpa autoscalingv1.HorizontalPodAutoscaler) (isViolated bool, err error) {
+func (r ClusterRuleHPAInvalidScaleTargetRef) HPAHasMatch(ctx context.Context, cli client.Client, l logr.Logger, hpa autoscalingv1.HorizontalPodAutoscaler) (hasMatch bool, err error) {
 	match := false
 	switch hpa.Spec.ScaleTargetRef.Kind {
 	case "Deployment":
@@ -152,7 +143,7 @@ func (r ClusterRuleHPAInvalidScaleTargetRef) EvaluateHPA(ctx context.Context, cl
 		l.Error(err, "kind", hpa.Spec.ScaleTargetRef.Kind, "name", hpa.Spec.ScaleTargetRef.Name)
 		return
 	}
-	return !match, nil
+	return match, nil
 }
 
 func (r ClusterRuleHPAInvalidScaleTargetRef) GetStatus() RuleStatus {

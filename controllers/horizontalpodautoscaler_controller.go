@@ -88,7 +88,8 @@ func (r *HorizontalPodAutoscalerReconciler) Reconcile(req ctrl.Request) (ctrl.Re
 		}
 		r.RuleStatues[rule.GetName()].Lock()
 		if err := rule.Evaluate(ctx, r.Client, l, nil, r.Notifiers); err != nil {
-			return ctrl.Result{}, err
+			r.RuleStatues[rule.GetName()].Unlock()
+			return ctrl.Result{RequeueAfter: RequeueIntervalForError}, err
 		}
 		r.Generations.Store(rule.GetName(), rule.GetGeneration()+1)
 		r.RuleStatues[rule.GetName()].RuleStatus = rule.GetStatus()
@@ -120,7 +121,8 @@ func (r *HorizontalPodAutoscalerReconciler) Reconcile(req ctrl.Request) (ctrl.Re
 		}
 		r.RuleStatues[rule.GetName()].Lock()
 		if err := rule.Evaluate(ctx, r.Client, l, hpa, r.Notifiers); err != nil {
-			return ctrl.Result{}, err
+			r.RuleStatues[rule.GetName()].Unlock()
+			return ctrl.Result{RequeueAfter: RequeueIntervalForError}, err
 		}
 		r.Generations.Store(rule.GetName(), rule.GetGeneration()+1)
 		r.RuleStatues[rule.GetName()].RuleStatus = rule.GetStatus()

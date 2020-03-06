@@ -47,11 +47,11 @@ type RequiredLabel struct {
 func (r RequiredLabel) Validate(labels map[string]string) (violation string, err error) {
 	v, ok := labels[r.Key]
 	if !ok {
-		return fmt.Sprintf("doenst have required label %s", r.Key), nil
+		return fmt.Sprintf("doenst have required label `%s`", r.Key), nil
 	}
 	if r.Match == "" || r.Match == "exact" {
 		if v != r.Value {
-			return fmt.Sprintf("has incorrect label value %s (expect %s) for label %s", v, r.Value, r.Key), nil
+			return fmt.Sprintf("has incorrect label value `%s` (expect `%s`) for label `%s`", v, r.Value, r.Key), nil
 		}
 	} else if r.Match == "regexp" {
 		var re *regexp.Regexp
@@ -60,7 +60,7 @@ func (r RequiredLabel) Validate(labels map[string]string) (violation string, err
 			return
 		}
 		if len(re.FindAllString(v, -1)) <= 0 {
-			return fmt.Sprintf("has incorrect label value %s (regex match %s) for label %s", v, r.Value, r.Key), nil
+			return fmt.Sprintf("has incorrect label value `%s` (regex match `%s`) for label `%s`", v, r.Value, r.Key), nil
 		}
 	}
 	return
@@ -127,23 +127,13 @@ type RuleStatus struct {
 	Violations map[string]string `json:"violations,omitempty"`
 }
 
-func (r *RuleStatus) AddViolation(namespacedName types.NamespacedName) {
+func (r *RuleStatus) SetViolation(namespacedName types.NamespacedName, isViolated bool) {
 	if r.Violations == nil {
 		r.Violations = map[string]string{}
 	}
-	r.Violations[namespacedName.String()] = time.Now().Format(time.RFC3339)
-}
-
-func (r *RuleStatus) RemoveViolation(namespacedName types.NamespacedName) {
-	if r.Violations == nil {
-		r.Violations = map[string]string{}
+	delete(r.Violations, namespacedName.String())
+	if isViolated {
+		r.Violations[namespacedName.String()] = time.Now().Format(time.RFC3339)
 	}
-	_, ok := r.Violations[namespacedName.String()]
-	if ok {
-		delete(r.Violations, namespacedName.String())
-	}
-}
-
-func (in *RuleStatus) SetCheckTime() {
-	in.CheckedAt = time.Now().Format(time.RFC3339)
+	r.CheckedAt = time.Now().Format(time.RFC3339)
 }

@@ -81,30 +81,22 @@ func (r RuleHPAReplicaPercentage) Evaluate(ctx context.Context, cli client.Clien
 		if err != nil {
 			return err
 		}
+		isViolated := false
 		if float64(hpa.Status.CurrentReplicas)/float64(hpa.Spec.MaxReplicas) >= float64(r.Spec.Percent)/100.0 {
 			l.Info("resource has violation", "resource", namespacedName.String())
-			r.Status.AddViolation(namespacedName)
-			for _, n := range r.Spec.Notification.Notifiers {
-				notifier, ok := notifiers[n]
-				if !ok {
-					l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
-					continue
-				}
-				notifier.AddAlert(r.Kind, r.Name, namespacedName, msg)
+			isViolated = true
+		}
+		r.Status.SetViolation(namespacedName, isViolated)
+		for _, n := range r.Spec.Notification.Notifiers {
+			notifier, ok := notifiers[n]
+			if !ok {
+				l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
+				continue
 			}
-		} else {
-			r.Status.RemoveViolation(namespacedName)
-			for _, n := range r.Spec.Notification.Notifiers {
-				notifier, ok := notifiers[n]
-				if !ok {
-					l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
-					continue
-				}
-				notifier.RemoveAlert(r.Kind, r.Name, namespacedName, msg)
-			}
+			notifier.SetAlert(r.Kind, r.Name, namespacedName, msg, isViolated)
 		}
 	}
-	r.Status.SetCheckTime()
+
 	if err := cli.Update(ctx, &r); err != nil {
 		l.Error(err, "unable to update rule status", "rule", r.Name)
 		return err
