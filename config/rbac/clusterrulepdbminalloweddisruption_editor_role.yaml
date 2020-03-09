@@ -1,0 +1,26 @@
+# permissions to do edit clusterrulepdbminalloweddisruptions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: clusterrulepdbminalloweddisruption-editor-role
+rules:
+- apiGroups:
+  - merlin.mercari.com
+  resources:
+  - clusterrulepdbminalloweddisruptions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - merlin.mercari.com
+  resources:
+  - clusterrulepdbminalloweddisruptions/status
+  verbs:
+  - get
+  - patch
+  - update

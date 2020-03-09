@@ -65,6 +65,7 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
+
 	if err := controllers.SetupReconcilers(mgr); err != nil {
 		setupLog.Error(err, "unable to setup reconcilers")
 	}

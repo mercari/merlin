@@ -46,7 +46,7 @@ func (e *EventFilter) UpdateEventFilter(evt event.UpdateEvent) bool {
 	return evt.MetaNew.GetResourceVersion() != evt.MetaOld.GetResourceVersion() || evt.MetaNew.GetGeneration() != evt.MetaOld.GetGeneration()
 }
 
-func (f *EventFilter) GenericEventFilter(e event.GenericEvent) bool {
+func (e *EventFilter) GenericEventFilter(evt event.GenericEvent) bool {
 	return true
 }
 

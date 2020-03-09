@@ -1,0 +1,15 @@
+apiVersion: merlin.mercari.com/v1
+kind: RulePDBMinAllowedDisruption
+metadata:
+  name: rule-pdb-min-allowed-disruption
+spec:
+  notification:
+    notifiers:
+      - slack-test
+    suppressed: false
+    severity: info
+  minAllowedDisruption: 2
+  selector: # selector is only for namespaced rule
+    name: nginx
+    matchLabels:
+      app: nginx

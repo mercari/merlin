@@ -1,0 +1,20 @@
+# permissions to do viewer clusterrulepdbminalloweddisruptions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: clusterrulepdbminalloweddisruption-viewer-role
+rules:
+- apiGroups:
+  - merlin.mercari.com
+  resources:
+  - clusterrulepdbminalloweddisruptions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - merlin.mercari.com
+  resources:
+  - clusterrulepdbminalloweddisruptions/status
+  verbs:
+  - get

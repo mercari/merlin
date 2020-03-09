@@ -25,6 +25,26 @@ rules:
 - apiGroups:
   - merlin.mercari.com
   resources:
+  - clusterrulepdbinvalidselectors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - merlin.mercari.com
+  resources:
+  - clusterrulepdbinvalidselectors/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - merlin.mercari.com
+  resources:
   - horizontalpodautoscalers
   verbs:
   - create

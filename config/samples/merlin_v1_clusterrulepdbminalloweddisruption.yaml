@@ -1,0 +1,15 @@
+apiVersion: merlin.mercari.com/v1
+kind: ClusterRulePDBMinAllowedDisruption
+metadata:
+  name: cluster-rule-pdb-min-allowed-disruption
+spec:
+  ignoreNamespaces:
+    - istio-system
+    - kube-system
+    - test
+  notification:
+    notifiers:
+      - slack-test
+    suppressed: false
+    severity: info
+  minAllowedDisruption: 1

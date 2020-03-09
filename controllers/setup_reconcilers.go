@@ -69,6 +69,14 @@ func SetupReconcilers(mgr manager.Manager) error {
 	}).SetupWithManager(mgr); err != nil {
 		return err
 	}
-
+	if err := (&PodDisruptionBudgetReconciler{
+		Reconciler{Client: mgr.GetClient(),
+			Log:       ctrl.Log.WithName("ctrl").WithName("PDB"),
+			Scheme:    mgr.GetScheme(),
+			Notifiers: notifierReconciler.Notifiers,
+		},
+	}).SetupWithManager(mgr); err != nil {
+		return err
+	}
 	return nil
 }

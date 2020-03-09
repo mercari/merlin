@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	merlinv1 "github.com/kouzoh/merlin/api/v1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -13,9 +14,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"strings"
 	"time"
-
 	// +kubebuilder:scaffold:imports
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
 )
 
 var _ = Describe("HPAControllerTests", func() {
@@ -125,7 +124,7 @@ var _ = Describe("HPAControllerTests", func() {
 				},
 			})).Should(Succeed())
 			hpa.Spec.ScaleTargetRef.Name = name
-			Expect(k8sClient.Update(ctx, hpa)).Should(Succeed(), "Failed to update hpa")
+			Expect(k8sClient.Update(ctx, hpa)).Should(Succeed())
 			// violation should be removed from rule status
 			Eventually(func() map[string]string {
 				r := &merlinv1.ClusterRuleHPAInvalidScaleTargetRef{}
