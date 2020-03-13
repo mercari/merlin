@@ -1,6 +1,12 @@
+[![CircleCI](https://circleci.com/gh/kouzoh/merlin.svg?style=svg&circle-token=5c9140edab4f649c6f3585fde235e63e093dd791)](https://circleci.com/gh/kouzoh/merlin)
+
 # Merlin
 
-An agent that sends out alerts when kubernetes resources are misconfigured or have issues.
+An agent that sends out alerts when kubernetes resources are misconfigured or have issues based on rules.
+
+## Technical background and designs
+
+You can find the technical backgrounds and design in [ERD](https://docs.google.com/document/d/1KB0cSwG6b_h9vW5qpq-am9YFDYod3sRLBHpY4gF4m68/edit#)
 
 ## Install
 
@@ -39,10 +45,23 @@ to install the controller.
 
 Note this will create a namespace called `merlin-us-dev` and install the controller manager in it.
 
-### Debugging
-You can also run the controller locally for debugging, just run 
+## Testing
+You can run the tests with 
+```bash
+make test
+```
+
+By default this uses [`envtest`](https://github.com/kubernetes-sigs/controller-runtime/tree/master/pkg/envtest)
+to run the tests, but you can change it to use existing cluster by setting environment varialbe `USE_EXISTING_CLUSTER=1`
+
+for references, [here](https://github.com/kubernetes-sigs/controller-runtime/blob/528cd19ee0de5d4732234566f756ef75f8c5ce77/pkg/envtest/server.go#L37-L45) 
+is the list of environment variables can be used to change `envtest`'s behavior.
+
+## Debugging with existing cluster
+You can also run the controllers locally against an existing cluster that your kube config points to, just run 
 ```bash
 make run
 ``` 
+
 
 
