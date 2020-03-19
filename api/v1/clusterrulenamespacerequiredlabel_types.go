@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-logr/logr"
+	"github.com/kouzoh/merlin/notifiers/alert"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -83,10 +84,6 @@ func (r ClusterRuleNamespaceRequiredLabel) Evaluate(ctx context.Context, cli cli
 		if err != nil {
 			return err
 		}
-		msg, err := r.Spec.Notification.ParseMessage(namespacedName, GetStructName(ns), violation)
-		if err != nil {
-			return err
-		}
 
 		isViolated := false
 		if violation != "" && !IsStringInSlice(r.Spec.IgnoreNamespaces, ns.Name) {
@@ -94,13 +91,21 @@ func (r ClusterRuleNamespaceRequiredLabel) Evaluate(ctx context.Context, cli cli
 			isViolated = true
 		}
 		r.Status.SetViolation(namespacedName, isViolated)
+		newAlert := alert.Alert{
+			Suppressed:       r.Spec.Notification.Suppressed,
+			Severity:         r.Spec.Notification.Severity,
+			MessageTemplate:  r.Spec.Notification.CustomMessageTemplate,
+			ViolationMessage: violation,
+			ResourceKind:     GetStructName(ns),
+			ResourceName:     namespacedName.String(),
+		}
 		for _, n := range r.Spec.Notification.Notifiers {
 			notifier, ok := notifiers[n]
 			if !ok {
 				l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
 				continue
 			}
-			notifier.SetAlert(r.Kind, r.Name, namespacedName, msg, isViolated)
+			notifier.SetAlert(r.Kind, r.Name, newAlert, isViolated)
 		}
 	}
 

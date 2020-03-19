@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-logr/logr"
+	"github.com/kouzoh/merlin/notifiers/alert"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -78,24 +79,27 @@ func (r ClusterRuleHPAReplicaPercentage) Evaluate(ctx context.Context, cli clien
 	}
 	for _, hpa := range hpas.Items {
 		namespacedName := types.NamespacedName{Namespace: hpa.Namespace, Name: hpa.Name}
-		msg, err := r.Spec.Notification.ParseMessage(namespacedName, GetStructName(hpa), fmt.Sprintf("HPA percentage is > %v%%", r.Spec.Percent))
-		if err != nil {
-			return err
-		}
-
 		isViolated := false
 		if float64(hpa.Status.CurrentReplicas)/float64(hpa.Spec.MaxReplicas) >= float64(r.Spec.Percent)/100.0 && !IsStringInSlice(r.Spec.IgnoreNamespaces, hpa.Namespace) {
 			l.Info("resource has violation", "resource", namespacedName.String())
 			isViolated = true
 		}
 		r.Status.SetViolation(namespacedName, isViolated)
+		newAlert := alert.Alert{
+			Suppressed:       r.Spec.Notification.Suppressed,
+			Severity:         r.Spec.Notification.Severity,
+			MessageTemplate:  r.Spec.Notification.CustomMessageTemplate,
+			ViolationMessage: fmt.Sprintf("HPA percentage is > %v%%", r.Spec.Percent),
+			ResourceKind:     GetStructName(hpa),
+			ResourceName:     namespacedName.String(),
+		}
 		for _, n := range r.Spec.Notification.Notifiers {
 			notifier, ok := notifiers[n]
 			if !ok {
 				l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
 				continue
 			}
-			notifier.SetAlert(r.Kind, r.Name, namespacedName, msg, isViolated)
+			notifier.SetAlert(r.Kind, r.Name, newAlert, isViolated)
 		}
 	}
 

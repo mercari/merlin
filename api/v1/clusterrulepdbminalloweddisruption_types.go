@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-logr/logr"
+	"github.com/kouzoh/merlin/notifiers/alert"
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -87,7 +88,6 @@ func (r ClusterRulePDBMinAllowedDisruption) Evaluate(ctx context.Context, cli cl
 	for _, p := range pdbs.Items {
 		var err error
 		var allowedDisruption int
-		msg := "PDB has enough allowed disruption"
 		namespacedName := types.NamespacedName{Namespace: p.Namespace, Name: p.Name}
 		pods := corev1.PodList{}
 		if err := cli.List(ctx, &pods, &client.ListOptions{
@@ -111,10 +111,6 @@ func (r ClusterRulePDBMinAllowedDisruption) Evaluate(ctx context.Context, cli cl
 			}
 			allowedDisruption = len(pods.Items) - minAvailable
 		}
-		msg, err = r.Spec.Notification.ParseMessage(namespacedName, GetStructName(p), fmt.Sprintf("PDB doesnt have enough disruption pod (expect %v, but currently is %v)", r.Spec.MinAllowedDisruption, allowedDisruption))
-		if err != nil {
-			return err
-		}
 
 		isViolated := false
 		if allowedDisruption < minAllowedDisruption && !IsStringInSlice(r.Spec.IgnoreNamespaces, p.Namespace) {
@@ -123,13 +119,21 @@ func (r ClusterRulePDBMinAllowedDisruption) Evaluate(ctx context.Context, cli cl
 		}
 
 		r.Status.SetViolation(namespacedName, isViolated)
+		newAlert := alert.Alert{
+			Suppressed:       r.Spec.Notification.Suppressed,
+			Severity:         r.Spec.Notification.Severity,
+			MessageTemplate:  r.Spec.Notification.CustomMessageTemplate,
+			ViolationMessage: fmt.Sprintf("PDB doesnt have enough disruption pod (expect %v, but currently is %v)", r.Spec.MinAllowedDisruption, allowedDisruption),
+			ResourceKind:     GetStructName(p),
+			ResourceName:     namespacedName.String(),
+		}
 		for _, n := range r.Spec.Notification.Notifiers {
 			notifier, ok := notifiers[n]
 			if !ok {
 				l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
 				continue
 			}
-			notifier.SetAlert(r.Kind, r.Name, namespacedName, msg, isViolated)
+			notifier.SetAlert(r.Kind, r.Name, newAlert, isViolated)
 		}
 	}
 

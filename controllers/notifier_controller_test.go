@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"github.com/kouzoh/merlin/notifiers/alert"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -48,18 +49,28 @@ var _ = Describe("HPAControllerTests", func() {
 		testResourceName := types.NamespacedName{Name: "testresource"}
 		alertKey := ruleKind + Separator + ruleName + Separator + testResourceName.String()
 		notifier := notifierReconciler.Notifiers[notifierName]
-		notifier.SetAlert(ruleKind, ruleName, testResourceName, testMsg, true)
+		a := alert.Alert{
+			Severity:         alert.SeverityInfo,
+			ViolationMessage: testMsg,
+			ResourceKind:     "hpa",
+			ResourceName:     testResourceName.String(),
+		}
+		notifier.SetAlert(ruleKind, ruleName, a, true)
 		By("Notifier should have the status")
-		alert, ok := notifier.Status.Alerts[alertKey]
+		a, ok := notifier.Status.Alerts[alertKey]
 		Expect(ok).To(Equal(true))
-		Expect(alert.Message).To(Equal(testMsg))
-		Expect(alert.Status).To(Equal(merlinv1.AlertStatusPending))
+		Expect(a.ViolationMessage).To(Equal(testMsg))
+		Expect(a.Status).To(Equal(alert.StatusPending))
 
 		By("Notifier status should be updated to k8s")
-		Eventually(func() merlinv1.Alert {
+		Eventually(func() alert.Alert {
 			n := &merlinv1.Notifier{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: notifierName}, n)).NotTo(HaveOccurred(), "Failed to get notifier")
 			return n.Status.Alerts[alertKey]
-		}, time.Second*3, time.Millisecond*200).Should(Equal(merlinv1.Alert{Message: testMsg, Status: merlinv1.AlertStatusPending}))
+		}, time.Second*3, time.Millisecond*200).Should(Equal(alert.Alert{
+			Severity:     a.Severity,
+			ResourceKind: a.ResourceKind,
+			ResourceName: a.ResourceName,
+			Status:       alert.StatusPending}))
 	})
 })

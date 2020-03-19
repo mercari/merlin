@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"github.com/kouzoh/merlin/notifiers/alert"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -88,7 +89,7 @@ var _ = Describe("PDBControllerTests", func() {
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: rule.Name}, r)).Should(Succeed())
 				return r.Status.Violations
 			}, time.Second*3, time.Millisecond*200).Should(HaveKey(pdbNamespacedName.String()))
-			Eventually(func() map[string]merlinv1.Alert {
+			Eventually(func() map[string]alert.Alert {
 				n := &merlinv1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
@@ -165,7 +166,7 @@ var _ = Describe("PDBControllerTests", func() {
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: rule.Name}, r)).Should(Succeed())
 				return r.Status.Violations
 			}, time.Second*3, time.Millisecond*200).ShouldNot(HaveKey(pdbNamespacedName.String()))
-			Eventually(func() map[string]merlinv1.Alert {
+			Eventually(func() map[string]alert.Alert {
 				n := &merlinv1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
@@ -200,7 +201,7 @@ var _ = Describe("PDBControllerTests", func() {
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: rule.Name}, r)).Should(Succeed())
 				return r.Status.Violations
 			}, time.Second*3, time.Millisecond*200).ShouldNot(HaveKey(pdbNamespacedName.String()))
-			Eventually(func() map[string]merlinv1.Alert {
+			Eventually(func() map[string]alert.Alert {
 				n := &merlinv1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
@@ -286,7 +287,7 @@ var _ = Describe("PDBControllerTests", func() {
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: rule.Name}, r)).Should(Succeed())
 				return r.Status.Violations
 			}, time.Second*3, time.Millisecond*200).ShouldNot(HaveKey(pdbNamespacedName.String()))
-			Eventually(func() map[string]merlinv1.Alert {
+			Eventually(func() map[string]alert.Alert {
 				n := &merlinv1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
@@ -321,7 +322,7 @@ var _ = Describe("PDBControllerTests", func() {
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: rule.Name}, r)).Should(Succeed())
 				return r.Status.Violations
 			}, time.Second*3, time.Millisecond*200).ShouldNot(HaveKey(pdbNamespacedName.String()))
-			Eventually(func() map[string]merlinv1.Alert {
+			Eventually(func() map[string]alert.Alert {
 				n := &merlinv1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts

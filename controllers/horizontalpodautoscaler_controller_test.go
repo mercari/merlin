@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	"github.com/kouzoh/merlin/notifiers/alert"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -94,7 +95,7 @@ var _ = Describe("HPAControllerTests", func() {
 			}, time.Second*3, time.Millisecond*200).Should(HaveKey(hpaNamespacedName.String()))
 			// alert should be added to notifier status
 			Expect(notifierReconciler.Notifiers[notifier.Name].Status.Alerts).Should(HaveKey(alertKey))
-			Eventually(func() map[string]merlinv1.Alert {
+			Eventually(func() map[string]alert.Alert {
 				n := &merlinv1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
@@ -132,7 +133,7 @@ var _ = Describe("HPAControllerTests", func() {
 				return r.Status.Violations
 			}, time.Second*5, time.Millisecond*200).ShouldNot(HaveKey(hpaNamespacedName.String()))
 			// alert should be removed from notifier status
-			Eventually(func() map[string]merlinv1.Alert {
+			Eventually(func() map[string]alert.Alert {
 				n := &merlinv1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts

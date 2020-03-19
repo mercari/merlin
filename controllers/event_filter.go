@@ -9,7 +9,6 @@ import (
 )
 
 const (
-	MinCheckInterval        = 10 * time.Second
 	RequeueIntervalForError = 30 * time.Second
 )
 

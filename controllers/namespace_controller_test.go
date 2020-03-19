@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	"github.com/kouzoh/merlin/notifiers/alert"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -91,7 +92,7 @@ var _ = Describe("NamespaceControllerTests", func() {
 			}, time.Second*5, time.Millisecond*200).Should(HaveKey(namespacedName.String()))
 
 			By("Alert should be added to notifier status")
-			Eventually(func() map[string]merlinv1.Alert {
+			Eventually(func() map[string]alert.Alert {
 				n := &merlinv1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts

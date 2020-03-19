@@ -41,7 +41,7 @@ spec:
               properties:
                 customMessageTemplate:
                   description: CustomMessageTemplate can used for customized message,
-                    variables can be used are "ResourceName, Severity, and DefaultMessage"
+                    variables can be used are "ResourceName, Severity, and ViolationMessage"
                   type: string
                 notifiers:
                   description: NotifiersCache is the list of notifiers for this notification
@@ -55,7 +55,7 @@ spec:
                   type: string
                 suppressed:
                   description: Suppressed means if this notification has been suppressed,
-                    useful for temporary
+                    used for temporary reduced the noise
                   type: boolean
               required:
               - notifiers

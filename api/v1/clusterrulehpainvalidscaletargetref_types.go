@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-logr/logr"
+	"github.com/kouzoh/merlin/notifiers/alert"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -79,10 +80,6 @@ func (r ClusterRuleHPAInvalidScaleTargetRef) Evaluate(ctx context.Context, cli c
 	for _, hpa := range hpas.Items {
 		l.Info("Checking hpa", "hpa", hpa.Name)
 		namespacedName := types.NamespacedName{Namespace: hpa.Namespace, Name: hpa.Name}
-		msg, err := r.Spec.Notification.ParseMessage(namespacedName, GetStructName(hpa), "HPA has invalid scale target ref")
-		if err != nil {
-			return err
-		}
 		hasMatch, err := r.HPAHasMatch(ctx, cli, l, hpa)
 		if err != nil {
 			return err
@@ -94,13 +91,21 @@ func (r ClusterRuleHPAInvalidScaleTargetRef) Evaluate(ctx context.Context, cli c
 			isViolated = true
 		}
 		r.Status.SetViolation(namespacedName, isViolated)
+		newAlert := alert.Alert{
+			Suppressed:       r.Spec.Notification.Suppressed,
+			Severity:         r.Spec.Notification.Severity,
+			MessageTemplate:  r.Spec.Notification.CustomMessageTemplate,
+			ViolationMessage: "HPA has invalid scale target ref",
+			ResourceKind:     GetStructName(hpa),
+			ResourceName:     namespacedName.String(),
+		}
 		for _, n := range r.Spec.Notification.Notifiers {
 			notifier, ok := notifiers[n]
 			if !ok {
 				l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
 				continue
 			}
-			notifier.SetAlert(r.Kind, r.Name, namespacedName, msg, isViolated)
+			notifier.SetAlert(r.Kind, r.Name, newAlert, isViolated)
 		}
 	}
 

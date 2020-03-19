@@ -1,26 +1,16 @@
 package v1
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"github.com/go-logr/logr"
+	"github.com/kouzoh/merlin/notifiers/alert"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"regexp"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"text/template"
 	"time"
-)
-
-const (
-	MessageTemplateVariableSeverity       = "{{.Severity}}"
-	MessageTemplateVariableResourceKind   = "{{.ResourceKind}}"
-	MessageTemplateVariableResourceName   = "{{.ResourceName}}"
-	MessageTemplateVariableDefaultMessage = "{{.DefaultMessage}}"
-
-	DefaultMessageTemplate = "[" + MessageTemplateVariableSeverity + "] " + MessageTemplateVariableResourceKind + " `" + MessageTemplateVariableResourceName + "` " + MessageTemplateVariableDefaultMessage
 )
 
 // +kubebuilder:object:generate=false
@@ -85,41 +75,12 @@ func (s *Selector) IsLabelMatched(resourceLabels map[string]string) bool {
 type Notification struct {
 	// NotifiersCache is the list of notifiers for this notification to send
 	Notifiers []string `json:"notifiers"`
-	// Suppressed means if this notification has been suppressed, useful for temporary
+	// Suppressed means if this notification has been suppressed, used for temporary reduced the noise
 	Suppressed bool `json:"suppressed,omitempty"`
 	// Severity is the severity of the issue, one of info, warning, critical, or fatal
-	Severity string `json:"severity,omitempty"`
-	// CustomMessageTemplate can used for customized message, variables can be used are "ResourceName, Severity, and DefaultMessage"
+	Severity alert.Severity `json:"severity,omitempty"`
+	// CustomMessageTemplate can used for customized message, variables can be used are "ResourceName, Severity, and ViolationMessage"
 	CustomMessageTemplate string `json:"customMessageTemplate,omitempty"`
-}
-
-func (n Notification) ParseMessage(resourceName types.NamespacedName, resourceKind, defaultMessage string) (string, error) {
-	messageTemplate := n.CustomMessageTemplate
-	if n.CustomMessageTemplate == "" {
-		messageTemplate = DefaultMessageTemplate
-	}
-	messageVariables := MessageTemplateVariables{
-		Severity:       string(n.Severity),
-		ResourceName:   resourceName,
-		ResourceKind:   resourceKind,
-		DefaultMessage: defaultMessage,
-	}
-	t, err := template.New("msg").Parse(messageTemplate)
-	if err != nil {
-		return "", err
-	}
-	var buf bytes.Buffer
-	if err := t.Execute(&buf, messageVariables); err != nil {
-		return "", err
-	}
-	return buf.String(), nil
-}
-
-type MessageTemplateVariables struct {
-	ResourceName   types.NamespacedName
-	ResourceKind   string
-	Severity       string
-	DefaultMessage string
 }
 
 type RuleStatus struct {
