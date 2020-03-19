@@ -58,24 +58,47 @@ type ClusterRuleHPAReplicaPercentage struct {
 	Status RuleStatus                          `json:"status,omitempty"`
 }
 
-func (r ClusterRuleHPAReplicaPercentage) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource interface{}, notifiers map[string]*Notifier) error {
+func (r ClusterRuleHPAReplicaPercentage) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource types.NamespacedName, notifiers map[string]*Notifier) error {
 	l.Info("Evaluating HPA replica percentage", "name", r.Name)
 	var hpas autoscalingv1.HorizontalPodAutoscalerList
+
 	// resource == nil is from rule changed, check resources for new status
-	if resource == nil {
+	if resource == (types.NamespacedName{}) {
 		if err := cli.List(ctx, &hpas); err != nil {
 			if apierrs.IsNotFound(err) {
-				l.Info("No HPA found for evaluation", "rule", r.Name)
+				l.Info("No resources found for evaluation", "name", r.Name)
 				return nil
 			}
 			return err
 		}
 	} else {
-		hpa, ok := resource.(autoscalingv1.HorizontalPodAutoscaler)
-		if !ok {
-			return fmt.Errorf("unable to convert resource to hpa")
+		hpa := autoscalingv1.HorizontalPodAutoscaler{}
+		err := cli.Get(ctx, resource, &hpa)
+		if apierrs.IsNotFound(err) {
+			// resource not found, wont add to the list, and removed it from alert
+			l.Info("resource not found - event is from deletion", "name", resource.String())
+			r.Status.SetViolation(resource, false)
+			newAlert := alert.Alert{
+				Suppressed:       r.Spec.Notification.Suppressed,
+				Severity:         r.Spec.Notification.Severity,
+				MessageTemplate:  r.Spec.Notification.CustomMessageTemplate,
+				ViolationMessage: "recovered since resource is deleted",
+				ResourceKind:     GetStructName(hpa),
+				ResourceName:     resource.String(),
+			}
+			for _, n := range r.Spec.Notification.Notifiers {
+				notifier, ok := notifiers[n]
+				if !ok {
+					l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
+					continue
+				}
+				notifier.SetAlert(r.Kind, r.Name, newAlert, false)
+			}
+		} else if err != nil {
+			return err
+		} else {
+			hpas.Items = append(hpas.Items, hpa)
 		}
-		hpas.Items = append(hpas.Items, hpa)
 	}
 	for _, hpa := range hpas.Items {
 		namespacedName := types.NamespacedName{Namespace: hpa.Namespace, Name: hpa.Name}

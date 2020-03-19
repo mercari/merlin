@@ -79,5 +79,16 @@ func SetupReconcilers(mgr manager.Manager) error {
 	}).SetupWithManager(mgr); err != nil {
 		return err
 	}
+
+	if err := (&ServiceReconciler{
+		Reconciler{Client: mgr.GetClient(),
+			Log:       ctrl.Log.WithName("ctrl").WithName("Service"),
+			Scheme:    mgr.GetScheme(),
+			Notifiers: notifierReconciler.Notifiers,
+		},
+	}).SetupWithManager(mgr); err != nil {
+		return err
+	}
+
 	return nil
 }

@@ -31,27 +31,27 @@ import (
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
 )
 
-// NamespaceReconciler reconciles a Namespace object
-type NamespaceReconciler struct {
+// ServiceReconciler reconciles a ClusterRuleServiceInvalidSelector object
+type ServiceReconciler struct {
 	Reconciler
 }
 
-// +kubebuilder:rbac:groups=merlin.mercari.com,resources=namespaces,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=merlin.mercari.com,resources=namespaces/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=merlin.mercari.com,resources=service,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=merlin.mercari.com,resources=service/status,verbs=get;update;patch
 
-func (r *NamespaceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	l := r.Log.WithName("Reconcile")
 
 	//  check if it's clusterRule or rule changes
 	resourceNames := strings.Split(req.Name, Separator)
 	if len(resourceNames) >= 2 {
-		l = l.WithValues("rule", req.Name)
+		l = l.WithValues("rule", req.NamespacedName)
 		var rule merlinv1.Rule
 		var err error
 		switch resourceNames[0] {
-		case GetStructName(merlinv1.ClusterRuleNamespaceRequiredLabel{}):
-			rule = &merlinv1.ClusterRuleNamespaceRequiredLabel{}
+		case GetStructName(merlinv1.ClusterRuleServiceInvalidSelector{}):
+			rule = &merlinv1.ClusterRuleServiceInvalidSelector{}
 			if err = r.Client.Get(ctx, types.NamespacedName{Namespace: req.Namespace, Name: resourceNames[1]}, rule); err != nil && !apierrs.IsNotFound(err) {
 				return ctrl.Result{RequeueAfter: RequeueIntervalForError}, err
 			}
@@ -80,15 +80,10 @@ func (r *NamespaceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, nil
 	}
 
-	l = l.WithValues("namespace", req.Name)
-	namespace := corev1.Namespace{}
-	if err := r.Client.Get(ctx, req.NamespacedName, &namespace); client.IgnoreNotFound(err) != nil {
-		l.Error(err, "failed to get namespace")
-		return ctrl.Result{}, err
-	}
+	l = l.WithValues("svc", req.NamespacedName)
 
 	// get list of applicable rules
-	rulesToApply, err := r.ListRules(ctx, req, namespace)
+	rulesToApply, err := r.ListRules(ctx, req)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -99,7 +94,7 @@ func (r *NamespaceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	// running evaluation and combine results
-	l.Info("Evaluating namespace")
+	l.Info("Evaluating svc")
 	for _, rule := range rulesToApply {
 		if _, ok := r.RuleStatues[rule.GetName()]; !ok {
 			r.RuleStatues[rule.GetName()] = &RuleStatusWithLock{}
@@ -117,48 +112,46 @@ func (r *NamespaceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 
-func (r *NamespaceReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	l := r.Log.WithName("SetupWithManager")
 	r.Generations = &sync.Map{}
 	r.RuleStatues = map[string]*RuleStatusWithLock{}
 
-	if err := mgr.GetFieldIndexer().IndexField(&merlinv1.ClusterRuleNamespaceRequiredLabel{}, indexField, func(rawObj runtime.Object) []string {
-		obj := rawObj.(*merlinv1.ClusterRuleNamespaceRequiredLabel)
+	if err := mgr.GetFieldIndexer().IndexField(&merlinv1.ClusterRuleServiceInvalidSelector{}, indexField, func(rawObj runtime.Object) []string {
+		obj := rawObj.(*merlinv1.ClusterRuleServiceInvalidSelector)
 		l.Info("indexing", GetStructName(obj), obj.Name)
 		return []string{obj.Name}
 	}); err != nil {
 		return err
 	}
 
-	if err := mgr.GetFieldIndexer().IndexField(&corev1.Namespace{}, indexField, func(rawObj runtime.Object) []string {
-		obj := rawObj.(*corev1.Namespace)
+	if err := mgr.GetFieldIndexer().IndexField(&corev1.Service{}, indexField, func(rawObj runtime.Object) []string {
+		obj := rawObj.(*corev1.Service)
 		l.Info("indexing", GetStructName(obj), obj.Name)
 		return []string{obj.Name}
 	}); err != nil {
 		return err
 	}
 
-	l.Info("initialize manager")
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Namespace{}).
+		For(&corev1.Service{}).
 		Watches(
-			&source.Kind{Type: &merlinv1.ClusterRuleNamespaceRequiredLabel{}},
-			&EventHandler{Log: l, Kind: GetStructName(merlinv1.ClusterRuleNamespaceRequiredLabel{}), ObjectGenerations: r.Generations}).
+			&source.Kind{Type: &merlinv1.ClusterRuleServiceInvalidSelector{}},
+			&EventHandler{Log: l, Kind: GetStructName(merlinv1.ClusterRuleServiceInvalidSelector{}), ObjectGenerations: r.Generations}).
 		WithEventFilter(GetPredicateFuncs(l, &sync.Map{})).
-		Named(corev1.Namespace{}.Kind).
 		Complete(r)
 }
 
-func (r *NamespaceReconciler) ListRules(ctx context.Context, req ctrl.Request, namespace corev1.Namespace) ([]merlinv1.Rule, error) {
-	l := r.Log.WithName("ListRules").WithValues("namespace", req.Namespace)
+func (r *ServiceReconciler) ListRules(ctx context.Context, req ctrl.Request) ([]merlinv1.Rule, error) {
+	l := r.Log.WithName("ListRules").WithValues("svc", req.NamespacedName)
 	var rules []merlinv1.Rule
-	requiredLabels := merlinv1.ClusterRuleNamespaceRequiredLabelList{}
-	if err := r.List(ctx, &requiredLabels); client.IgnoreNotFound(err) != nil {
+	noEndpointRules := merlinv1.ClusterRuleServiceInvalidSelectorList{}
+	if err := r.List(ctx, &noEndpointRules); client.IgnoreNotFound(err) != nil {
 		l.Error(err, "failed to get ClusterRuleNamespaceRequiredLabel")
 		return rules, err
 	}
 
-	for _, cRule := range requiredLabels.Items {
+	for _, cRule := range noEndpointRules.Items {
 		ignoreNamespace := false
 		for _, ns := range cRule.Spec.IgnoreNamespaces {
 			if ns == req.Name { // note for namespace resource, its "namespace" is empty string

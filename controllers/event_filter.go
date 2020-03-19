@@ -23,6 +23,7 @@ func (e *EventFilter) CreateEventFilter(evt event.CreateEvent) bool {
 }
 
 func (e *EventFilter) DeleteEventFilter(evt event.DeleteEvent) bool {
+	e.Log.Info("event filter received delete event")
 	return true
 }
 

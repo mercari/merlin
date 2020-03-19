@@ -44,7 +44,7 @@ spec:
                     variables can be used are "ResourceName, Severity, and ViolationMessage"
                   type: string
                 notifiers:
-                  description: NotifiersCache is the list of notifiers for this notification
+                  description: Notifiers is the list of notifiers for this notification
                     to send
                   items:
                     type: string

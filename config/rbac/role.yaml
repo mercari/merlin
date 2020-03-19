@@ -122,3 +122,23 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - merlin.mercari.com
+  resources:
+  - service
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - merlin.mercari.com
+  resources:
+  - service/status
+  verbs:
+  - get
+  - patch
+  - update

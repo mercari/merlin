@@ -57,7 +57,7 @@ func (r *PodDisruptionBudgetReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 			}
 
 		default:
-			// this should not happen since we only watches resources we care, but just in case we forget to add handling
+			// this should not happen since reconciler only watches resources we care, but just in case we forget to add handling
 			e := fmt.Errorf("unexpected resource change")
 			l.Error(e, req.NamespacedName.String())
 			return ctrl.Result{}, e
@@ -70,7 +70,7 @@ func (r *PodDisruptionBudgetReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 			r.RuleStatues[rule.GetName()] = &RuleStatusWithLock{}
 		}
 		r.RuleStatues[rule.GetName()].Lock()
-		if err := rule.Evaluate(ctx, r.Client, l, nil, r.Notifiers); err != nil {
+		if err := rule.Evaluate(ctx, r.Client, l, types.NamespacedName{}, r.Notifiers); err != nil {
 			r.RuleStatues[rule.GetName()].Unlock()
 			return ctrl.Result{RequeueAfter: RequeueIntervalForError}, err
 		}
@@ -104,7 +104,7 @@ func (r *PodDisruptionBudgetReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 			r.RuleStatues[rule.GetName()] = &RuleStatusWithLock{}
 		}
 		r.RuleStatues[rule.GetName()].Lock()
-		if err := rule.Evaluate(ctx, r.Client, l, pdb, r.Notifiers); err != nil {
+		if err := rule.Evaluate(ctx, r.Client, l, req.NamespacedName, r.Notifiers); err != nil {
 			r.RuleStatues[rule.GetName()].Unlock()
 			return ctrl.Result{RequeueAfter: RequeueIntervalForError}, err
 		}
@@ -129,10 +129,10 @@ func (r *PodDisruptionBudgetReconciler) SetupWithManager(mgr ctrl.Manager) error
 		return err
 	}
 
-	if err := mgr.GetFieldIndexer().IndexField(&policyv1beta1.PodDisruptionBudget{}, ".metadata.name", func(rawObj runtime.Object) []string {
-		namespace := rawObj.(*policyv1beta1.PodDisruptionBudget)
-		l.Info("indexing", "namespace", namespace.Name)
-		return []string{namespace.Name}
+	if err := mgr.GetFieldIndexer().IndexField(&policyv1beta1.PodDisruptionBudget{}, indexField, func(rawObj runtime.Object) []string {
+		obj := rawObj.(*policyv1beta1.PodDisruptionBudget)
+		l.Info("indexing", GetStructName(obj), obj.Name)
+		return []string{obj.Name}
 	}); err != nil {
 		return err
 	}

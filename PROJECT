@@ -34,4 +34,7 @@ resources:
 - group: merlin
   kind: RulePDBMinAllowedDisruption
   version: v1
+- group: merlin
+  kind: ClusterRuleServiceInvalidSelector
+  version: v1
 version: "2"

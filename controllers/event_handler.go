@@ -69,6 +69,7 @@ func (e *EventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInt
 
 // Delete handles events from deleting resources
 func (e *EventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+	e.Log.Info("event handler received delete event")
 	if evt.Meta == nil {
 		e.Log.Error(nil, "DeleteEvent received with no metadata", "event", evt)
 		return

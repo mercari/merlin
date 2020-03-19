@@ -44,9 +44,6 @@ func (r *HorizontalPodAutoscalerReconciler) Reconcile(req ctrl.Request) (ctrl.Re
 	ctx := context.Background()
 	l := r.Log.WithName("Reconcile")
 
-	// TODOL before performing evaluation for each rule, check if they're locked, if locked means there's an ongoing update to the status
-	// wait for the lock (rule checking violations) to release and get the updated rule properties then check.
-
 	//  check if it's clusterRule or rule changes
 	resourceNames := strings.Split(req.Name, Separator)
 	if len(resourceNames) >= 2 {
@@ -74,7 +71,7 @@ func (r *HorizontalPodAutoscalerReconciler) Reconcile(req ctrl.Request) (ctrl.Re
 			}
 
 		default:
-			// this should not happen since we only watches resources we care, but just in case we forget to add handling
+			// this should not happen since reconciler only watches resources we care, but just in case we forget to add handling
 			e := fmt.Errorf("unexpected resource change")
 			l.Error(e, req.NamespacedName.String())
 			return ctrl.Result{}, e
@@ -87,7 +84,7 @@ func (r *HorizontalPodAutoscalerReconciler) Reconcile(req ctrl.Request) (ctrl.Re
 			r.RuleStatues[rule.GetName()] = &RuleStatusWithLock{}
 		}
 		r.RuleStatues[rule.GetName()].Lock()
-		if err := rule.Evaluate(ctx, r.Client, l, nil, r.Notifiers); err != nil {
+		if err := rule.Evaluate(ctx, r.Client, l, types.NamespacedName{}, r.Notifiers); err != nil {
 			r.RuleStatues[rule.GetName()].Unlock()
 			return ctrl.Result{RequeueAfter: RequeueIntervalForError}, err
 		}
@@ -120,7 +117,7 @@ func (r *HorizontalPodAutoscalerReconciler) Reconcile(req ctrl.Request) (ctrl.Re
 			r.RuleStatues[rule.GetName()] = &RuleStatusWithLock{}
 		}
 		r.RuleStatues[rule.GetName()].Lock()
-		if err := rule.Evaluate(ctx, r.Client, l, hpa, r.Notifiers); err != nil {
+		if err := rule.Evaluate(ctx, r.Client, l, req.NamespacedName, r.Notifiers); err != nil {
 			r.RuleStatues[rule.GetName()].Unlock()
 			return ctrl.Result{RequeueAfter: RequeueIntervalForError}, err
 		}

@@ -17,59 +17,55 @@ package v1
 
 import (
 	"context"
-	"fmt"
 	"github.com/go-logr/logr"
 	"github.com/kouzoh/merlin/notifiers/alert"
 	corev1 "k8s.io/api/core/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// RulePDBMinAllowedDisruptionSpec defines the desired state of RulePDBMinAllowedDisruption
-type RulePDBMinAllowedDisruptionSpec struct {
+// ClusterRuleServiceInvalidSelectorSpec defines the desired state of ClusterRuleServiceInvalidSelector
+type ClusterRuleServiceInvalidSelectorSpec struct {
+	// IgnoreNamespaces is the list of namespaces to ignore for this rule
+	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
 	// Notification contains the channels and messages to send out to external system, such as slack or pagerduty.
 	Notification Notification `json:"notification"`
-	// Selector selects name or matched labels for a resource to apply this rule
-	Selector Selector `json:"selector"`
-	// MinAllowedDisruption is the minimal allowed disruption for this rule, should be an integer, default to 1
-	MinAllowedDisruption int `json:"minAllowedDisruption,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// RulePDBMinAllowedDisruptionList contains a list of RulePDBMinAllowedDisruption
-type RulePDBMinAllowedDisruptionList struct {
+// ClusterRuleServiceInvalidSelectorList contains a list of ClusterRuleServiceInvalidSelector
+type ClusterRuleServiceInvalidSelectorList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []RulePDBMinAllowedDisruption `json:"items"`
+	Items           []ClusterRuleServiceInvalidSelector `json:"items"`
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:scope=Cluster
 
-// RulePDBMinAllowedDisruption is the Schema for the rulepdbminalloweddisruptions API
-type RulePDBMinAllowedDisruption struct {
+// ClusterRuleServiceInvalidSelector is the Schema for the clusterruleserviceinvalidselector API
+type ClusterRuleServiceInvalidSelector struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   RulePDBMinAllowedDisruptionSpec `json:"spec,omitempty"`
-	Status RuleStatus                      `json:"status,omitempty"`
+	Spec   ClusterRuleServiceInvalidSelectorSpec `json:"spec,omitempty"`
+	Status RuleStatus                            `json:"status,omitempty"`
 }
 
-func (r RulePDBMinAllowedDisruption) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource types.NamespacedName, notifiers map[string]*Notifier) error {
-	l.Info("Evaluating PDB invalid selector", "name", r.Name)
-	var pdbs policyv1beta1.PodDisruptionBudgetList
+func (r ClusterRuleServiceInvalidSelector) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource types.NamespacedName, notifiers map[string]*Notifier) error {
+	l.Info("Evaluating Service Endpoints", "name", r.Name)
+	var svcs corev1.ServiceList
 
 	// empty resource is from rule changed, check resources for new status
 	if resource == (types.NamespacedName{}) {
-		if err := cli.List(ctx, &pdbs, &client.ListOptions{Namespace: r.Namespace}); err != nil {
+		if err := cli.List(ctx, &svcs); err != nil {
 			if apierrs.IsNotFound(err) {
 				l.Info("No resources found for evaluation", "name", r.Name)
 				return nil
@@ -77,8 +73,8 @@ func (r RulePDBMinAllowedDisruption) Evaluate(ctx context.Context, cli client.Cl
 			return err
 		}
 	} else {
-		pdb := policyv1beta1.PodDisruptionBudget{}
-		err := cli.Get(ctx, resource, &pdb)
+		svc := corev1.Service{}
+		err := cli.Get(ctx, resource, &svc)
 		if apierrs.IsNotFound(err) {
 			// resource not found, wont add to the list, and removed it from alert
 			l.Info("resource not found - event is from deletion", "name", resource.String())
@@ -88,7 +84,7 @@ func (r RulePDBMinAllowedDisruption) Evaluate(ctx context.Context, cli client.Cl
 				Severity:         r.Spec.Notification.Severity,
 				MessageTemplate:  r.Spec.Notification.CustomMessageTemplate,
 				ViolationMessage: "recovered since resource is deleted",
-				ResourceKind:     GetStructName(pdb),
+				ResourceKind:     GetStructName(svc),
 				ResourceName:     resource.String(),
 			}
 			for _, n := range r.Spec.Notification.Notifiers {
@@ -102,44 +98,22 @@ func (r RulePDBMinAllowedDisruption) Evaluate(ctx context.Context, cli client.Cl
 		} else if err != nil {
 			return err
 		} else {
-			pdbs.Items = append(pdbs.Items, pdb)
+			svcs.Items = append(svcs.Items, svc)
 		}
 	}
 
-	minAllowedDisruption := 1
-	if r.Spec.MinAllowedDisruption > minAllowedDisruption {
-		minAllowedDisruption = r.Spec.MinAllowedDisruption
-	}
-
-	for _, p := range pdbs.Items {
-		var err error
-		var allowedDisruption int
-		namespacedName := types.NamespacedName{Namespace: p.Namespace, Name: p.Name}
+	for _, svc := range svcs.Items {
+		namespacedName := types.NamespacedName{Namespace: svc.Namespace, Name: svc.Name}
 		pods := corev1.PodList{}
 		if err := cli.List(ctx, &pods, &client.ListOptions{
-			Namespace: p.Namespace,
-			Raw: &metav1.ListOptions{
-				LabelSelector: labels.Set(p.Spec.Selector.MatchLabels).String(),
-			},
+			Namespace:     svc.Namespace,
+			LabelSelector: labels.Set(svc.Spec.Selector).AsSelector(),
 		}); err != nil && client.IgnoreNotFound(err) != nil {
 			return err
 		}
-		if p.Spec.MaxUnavailable != nil {
-			allowedDisruption, err = intstr.GetValueFromIntOrPercent(p.Spec.MaxUnavailable, int(len(pods.Items)), true)
-			if err != nil {
-				return err
-			}
-		} else if p.Spec.MinAvailable != nil {
-			var minAvailable int
-			minAvailable, err := intstr.GetValueFromIntOrPercent(p.Spec.MinAvailable, int(len(pods.Items)), true)
-			if err != nil {
-				return err
-			}
-			allowedDisruption = len(pods.Items) - minAvailable
-		}
 
 		isViolated := false
-		if allowedDisruption < minAllowedDisruption {
+		if len(pods.Items) == 0 && !IsStringInSlice(r.Spec.IgnoreNamespaces, svc.Namespace) {
 			l.Info("resource has violation", "resource", namespacedName.String())
 			isViolated = true
 		}
@@ -149,8 +123,8 @@ func (r RulePDBMinAllowedDisruption) Evaluate(ctx context.Context, cli client.Cl
 			Suppressed:       r.Spec.Notification.Suppressed,
 			Severity:         r.Spec.Notification.Severity,
 			MessageTemplate:  r.Spec.Notification.CustomMessageTemplate,
-			ViolationMessage: fmt.Sprintf("PDB doesnt have enough disruption pod (expect %v, but currently is %v)", r.Spec.MinAllowedDisruption, allowedDisruption),
-			ResourceKind:     GetStructName(p),
+			ViolationMessage: "Service has no matched pods",
+			ResourceKind:     GetStructName(svc),
 			ResourceName:     namespacedName.String(),
 		}
 		for _, n := range r.Spec.Notification.Notifiers {
@@ -163,6 +137,7 @@ func (r RulePDBMinAllowedDisruption) Evaluate(ctx context.Context, cli client.Cl
 		}
 	}
 
+	l.Info("updating rule", "status", r.Status)
 	if err := cli.Update(ctx, &r); err != nil {
 		l.Error(err, "unable to update rule status", "rule", r.Name)
 		return err
@@ -170,10 +145,10 @@ func (r RulePDBMinAllowedDisruption) Evaluate(ctx context.Context, cli client.Cl
 	return nil
 }
 
-func (r RulePDBMinAllowedDisruption) GetStatus() RuleStatus {
+func (r ClusterRuleServiceInvalidSelector) GetStatus() RuleStatus {
 	return r.Status
 }
 
 func init() {
-	SchemeBuilder.Register(&RulePDBMinAllowedDisruption{}, &RulePDBMinAllowedDisruptionList{})
+	SchemeBuilder.Register(&ClusterRuleServiceInvalidSelector{}, &ClusterRuleServiceInvalidSelectorList{})
 }

@@ -6,18 +6,18 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.2.4
   creationTimestamp: null
-  name: clusterrulepdbinvalidselectors.merlin.mercari.com
+  name: clusterruleserviceinvalidselectors.merlin.mercari.com
 spec:
   group: merlin.mercari.com
   names:
-    kind: ClusterRulePDBInvalidSelector
-    listKind: ClusterRulePDBInvalidSelectorList
-    plural: clusterrulepdbinvalidselectors
-    singular: clusterrulepdbinvalidselector
+    kind: ClusterRuleServiceInvalidSelector
+    listKind: ClusterRuleServiceInvalidSelectorList
+    plural: clusterruleserviceinvalidselectors
+    singular: clusterruleserviceinvalidselector
   scope: Cluster
   validation:
     openAPIV3Schema:
-      description: ClusterRulePDBInvalidSelector is the Schema for the clusterrulepdbinvalidselectors
+      description: ClusterRuleServiceInvalidSelector is the Schema for the clusterruleserviceinvalidselector
         API
       properties:
         apiVersion:
@@ -33,8 +33,8 @@ spec:
         metadata:
           type: object
         spec:
-          description: ClusterRulePDBInvalidSelectorSpec defines the desired state
-            of ClusterRulePDBInvalidSelector
+          description: ClusterRuleServiceInvalidSelectorSpec defines the desired state
+            of ClusterRuleServiceInvalidSelector
           properties:
             ignoreNamespaces:
               description: IgnoreNamespaces is the list of namespaces to ignore for

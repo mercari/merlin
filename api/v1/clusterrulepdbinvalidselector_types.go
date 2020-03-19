@@ -17,7 +17,6 @@ package v1
 
 import (
 	"context"
-	"fmt"
 	"github.com/go-logr/logr"
 	"github.com/kouzoh/merlin/notifiers/alert"
 	corev1 "k8s.io/api/core/v1"
@@ -58,25 +57,49 @@ type ClusterRulePDBInvalidSelector struct {
 	Status RuleStatus                        `json:"status,omitempty"`
 }
 
-func (r ClusterRulePDBInvalidSelector) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource interface{}, notifiers map[string]*Notifier) error {
+func (r ClusterRulePDBInvalidSelector) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource types.NamespacedName, notifiers map[string]*Notifier) error {
 	l.Info("Evaluating PDB invalid selector", "name", r.Name)
 	var pdbs policyv1beta1.PodDisruptionBudgetList
-	// resource == nil is from rule changed, check resources for new status
-	if resource == nil {
+
+	// empty resource is from rule changed, check resources for new status
+	if resource == (types.NamespacedName{}) {
 		if err := cli.List(ctx, &pdbs); err != nil {
 			if apierrs.IsNotFound(err) {
-				l.Info("No pdbs found for evaluation", "name", r.Name)
+				l.Info("No resources found for evaluation", "name", r.Name)
 				return nil
 			}
 			return err
 		}
 	} else {
-		pdb, ok := resource.(policyv1beta1.PodDisruptionBudget)
-		if !ok {
-			return fmt.Errorf("unable to convert resource to type %s", policyv1beta1.PodDisruptionBudget{}.Kind)
+		pdb := policyv1beta1.PodDisruptionBudget{}
+		err := cli.Get(ctx, resource, &pdb)
+		if apierrs.IsNotFound(err) {
+			// resource not found, wont add to the list, and removed it from alert
+			l.Info("resource not found - event is from deletion", "name", resource.String())
+			r.Status.SetViolation(resource, false)
+			newAlert := alert.Alert{
+				Suppressed:       r.Spec.Notification.Suppressed,
+				Severity:         r.Spec.Notification.Severity,
+				MessageTemplate:  r.Spec.Notification.CustomMessageTemplate,
+				ViolationMessage: "recovered since resource is deleted",
+				ResourceKind:     GetStructName(pdb),
+				ResourceName:     resource.String(),
+			}
+			for _, n := range r.Spec.Notification.Notifiers {
+				notifier, ok := notifiers[n]
+				if !ok {
+					l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
+					continue
+				}
+				notifier.SetAlert(r.Kind, r.Name, newAlert, false)
+			}
+		} else if err != nil {
+			return err
+		} else {
+			pdbs.Items = append(pdbs.Items, pdb)
 		}
-		pdbs.Items = append(pdbs.Items, pdb)
 	}
+
 	for _, p := range pdbs.Items {
 		namespacedName := types.NamespacedName{Namespace: p.Namespace, Name: p.Name}
 		pods := corev1.PodList{}

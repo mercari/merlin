@@ -16,7 +16,7 @@ import (
 // +kubebuilder:object:generate=false
 
 type Rule interface {
-	Evaluate(ctx context.Context, cli client.Client, log logr.Logger, resource interface{}, notifiers map[string]*Notifier) error
+	Evaluate(ctx context.Context, cli client.Client, log logr.Logger, resource types.NamespacedName, notifiers map[string]*Notifier) error
 	GetName() string
 	GetStatus() RuleStatus
 	GetGeneration() int64
@@ -73,7 +73,7 @@ func (s *Selector) IsLabelMatched(resourceLabels map[string]string) bool {
 }
 
 type Notification struct {
-	// NotifiersCache is the list of notifiers for this notification to send
+	// Notifiers is the list of notifiers for this notification to send
 	Notifiers []string `json:"notifiers"`
 	// Suppressed means if this notification has been suppressed, used for temporary reduced the noise
 	Suppressed bool `json:"suppressed,omitempty"`

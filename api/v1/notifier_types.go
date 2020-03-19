@@ -93,10 +93,12 @@ func (n *Notifier) Notify(client *http.Client) {
 		}
 		if a.Status != alert.StatusFiring { // wont send again if already firing
 			if n.Spec.Slack.Channel != "" {
-				a.Error = n.Spec.Slack.SendAlert(client, a).Error()
-				if a.Error != "" {
+				err := n.Spec.Slack.SendAlert(client, a)
+				if err != nil {
+					a.Error = err.Error()
 					a.Status = alert.StatusError
 				} else {
+					a.Error = ""
 					a.Status = alert.StatusFiring
 				}
 			} else {
@@ -114,7 +116,7 @@ func (n *Notifier) Notify(client *http.Client) {
 }
 
 func (n *Notifier) SetAlert(ruleKind, ruleName string, newAlert alert.Alert, isViolated bool) {
-	alertName := strings.Join([]string{ruleKind, ruleName, newAlert.ResourceName}, Separator)
+	name := strings.Join([]string{ruleKind, ruleName, newAlert.ResourceName}, Separator)
 	if n.Status.Alerts == nil {
 		n.Status.Alerts = map[string]alert.Alert{}
 	}
@@ -126,9 +128,9 @@ func (n *Notifier) SetAlert(ruleKind, ruleName string, newAlert alert.Alert, isV
 	}
 
 	if isViolated {
-		if a, ok := n.Status.Alerts[alertName]; !ok {
+		if a, ok := n.Status.Alerts[name]; !ok {
 			newAlert.Status = alert.StatusPending
-			n.Status.Alerts[alertName] = newAlert
+			n.Status.Alerts[name] = newAlert
 		} else {
 			switch a.Status {
 			case alert.StatusFiring, alert.StatusPending, alert.StatusError:
@@ -136,13 +138,13 @@ func (n *Notifier) SetAlert(ruleKind, ruleName string, newAlert alert.Alert, isV
 			case alert.StatusRecovering:
 				// recovering alert gets fired again, set them back to firing.
 				newAlert.Status = alert.StatusFiring
-				n.Status.Alerts[alertName] = newAlert
+				n.Status.Alerts[name] = newAlert
 			}
 		}
 	} else {
-		if _, ok := n.Status.Alerts[alertName]; ok {
+		if _, ok := n.Status.Alerts[name]; ok {
 			newAlert.Status = alert.StatusRecovering
-			n.Status.Alerts[alertName] = newAlert
+			n.Status.Alerts[name] = newAlert
 		}
 	}
 }

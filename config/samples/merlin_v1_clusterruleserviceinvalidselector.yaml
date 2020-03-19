@@ -1,0 +1,14 @@
+apiVersion: merlin.mercari.com/v1
+kind: ClusterRuleServiceInvalidSelector
+metadata:
+  name: cluster-rule-service-invalid-selector
+spec:
+  ignoreNamespaces:
+    - istio-system
+    - kube-system
+    - test
+  notification:
+    notifiers:
+      - slack-test
+    suppressed: false
+    severity: info
