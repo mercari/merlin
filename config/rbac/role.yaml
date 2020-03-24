@@ -85,7 +85,7 @@ rules:
 - apiGroups:
   - merlin.mercari.com
   resources:
-  - notifis
+  - notifiers
   verbs:
   - create
   - delete
@@ -97,7 +97,7 @@ rules:
 - apiGroups:
   - merlin.mercari.com
   resources:
-  - notifis/status
+  - notifiers/status
   verbs:
   - get
   - patch

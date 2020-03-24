@@ -2,12 +2,18 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"github.com/kouzoh/merlin/notifiers/alert"
+	"github.com/kouzoh/merlin/notifiers/slack"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"io/ioutil"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"net/http"
+	"net/http/httptest"
 	"time"
 
 	// +kubebuilder:scaffold:imports
@@ -15,11 +21,42 @@ import (
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
 )
 
-var _ = Describe("HPAControllerTests", func() {
+var _ = Describe("NotifierControllerTests", func() {
 	var ctx = context.Background()
-	const notifierName = "test-notifier"
-	const ruleKind = "testRuleKind"
-	const ruleName = "testRuleName"
+	const (
+		ruleKind = "testRuleKind"
+		ruleName = "testRuleName"
+	)
+
+	var testAlert = alert.Alert{
+		Severity:         alert.SeverityInfo,
+		ViolationMessage: "test alert message",
+		ResourceKind:     "hpa",
+		ResourceName:     "default/test-resource-for-notifiers",
+	}
+	var alertKey = ruleKind + Separator + ruleName + Separator + testAlert.ResourceName
+	var m = http.NewServeMux()
+	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		req := &slack.Request{}
+		body, err := ioutil.ReadAll(r.Body)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(json.Unmarshal(body, req)).Should(Succeed())
+		Expect(req.Username).To(Equal("Merlin"))
+		w.WriteHeader(200)
+		w.Write([]byte(`ok`))
+	})
+	var ts = httptest.NewServer(m)
+
+	var testNotifier = &merlinv1.Notifier{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-notifier"},
+		Spec: merlinv1.NotifierSpec{
+			NotifyInterval: 1,
+			Slack: slack.Slack{
+				WebhookURL: ts.URL,
+				Channel:    "test",
+			},
+		},
+	}
 
 	It("TestApplyEmptyNotifier", func() {
 		err := k8sClient.Create(ctx, &merlinv1.Notifier{})
@@ -33,44 +70,75 @@ var _ = Describe("HPAControllerTests", func() {
 	})
 
 	It("TestApplyNotifier", func() {
-		Expect(k8sClient.Create(ctx, &merlinv1.Notifier{
-			ObjectMeta: metav1.ObjectMeta{Name: notifierName},
-			Spec:       merlinv1.NotifierSpec{NotifyInterval: 1},
-		})).Should(Succeed(), "Failed to apply cluster rule")
+
+		Expect(k8sClient.Create(ctx, testNotifier)).Should(Succeed())
 		By("test notifier should be added into notifier reconciler's cache")
 		Eventually(func() bool {
-			_, ok := notifierReconciler.Notifiers[notifierName]
+			_, ok := notifierReconciler.Notifiers[testNotifier.Name]
 			return ok
 		}, time.Second*2, time.Millisecond*200).Should(Equal(true))
 	})
 
-	It("TestAddMessageToNotifier", func() {
-		testMsg := "test alert message"
-		testResourceName := types.NamespacedName{Name: "testresource"}
-		alertKey := ruleKind + Separator + ruleName + Separator + testResourceName.String()
-		notifier := notifierReconciler.Notifiers[notifierName]
-		a := alert.Alert{
-			Severity:         alert.SeverityInfo,
-			ViolationMessage: testMsg,
-			ResourceKind:     "hpa",
-			ResourceName:     testResourceName.String(),
-		}
-		notifier.SetAlert(ruleKind, ruleName, a, true)
-		By("Notifier should have the status")
+	It("TestAddAlertToNotifier", func() {
+		notifier := notifierReconciler.Notifiers[testNotifier.Name]
+		notifier.SetAlert(ruleKind, ruleName, testAlert, true)
+		By("Notifier cache should have the status")
 		a, ok := notifier.Status.Alerts[alertKey]
 		Expect(ok).To(Equal(true))
-		Expect(a.ViolationMessage).To(Equal(testMsg))
-		Expect(a.Status).To(Equal(alert.StatusPending))
+		Expect(a).To(Equal(alert.Alert{
+			Severity:         testAlert.Severity,
+			ResourceKind:     testAlert.ResourceKind,
+			ResourceName:     testAlert.ResourceName,
+			ViolationMessage: testAlert.ViolationMessage,
+			Status:           alert.StatusPending}))
 
 		By("Notifier status should be updated to k8s")
 		Eventually(func() alert.Alert {
 			n := &merlinv1.Notifier{}
-			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: notifierName}, n)).NotTo(HaveOccurred(), "Failed to get notifier")
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: testNotifier.Name}, n)).Should(Succeed())
 			return n.Status.Alerts[alertKey]
 		}, time.Second*3, time.Millisecond*200).Should(Equal(alert.Alert{
-			Severity:     a.Severity,
-			ResourceKind: a.ResourceKind,
-			ResourceName: a.ResourceName,
-			Status:       alert.StatusPending}))
+			Severity:         testAlert.Severity,
+			ResourceKind:     testAlert.ResourceKind,
+			ResourceName:     testAlert.ResourceName,
+			ViolationMessage: testAlert.ViolationMessage,
+			Status:           alert.StatusFiring}))
+
+		By("Notifier cache should update the status")
+		a, ok = notifier.Status.Alerts[alertKey]
+		Expect(ok).To(Equal(true))
+		Expect(a).To(Equal(alert.Alert{
+			Severity:         testAlert.Severity,
+			ResourceKind:     testAlert.ResourceKind,
+			ResourceName:     testAlert.ResourceName,
+			ViolationMessage: testAlert.ViolationMessage,
+			Status:           alert.StatusFiring}))
+
+	})
+
+	It("TestRemoveAlertFromNotifier", func() {
+		notifier := notifierReconciler.Notifiers[testNotifier.Name]
+		notifier.SetAlert(ruleKind, ruleName, testAlert, false)
+		expectAlert := alert.Alert{
+			Severity:         testAlert.Severity,
+			ResourceKind:     testAlert.ResourceKind,
+			ResourceName:     testAlert.ResourceName,
+			ViolationMessage: testAlert.ViolationMessage,
+			Status:           alert.StatusRecovering}
+		By("Notifier cache should have new status")
+		a, ok := notifier.Status.Alerts[alertKey]
+		Expect(ok).To(Equal(true))
+		Expect(a).To(Equal(expectAlert))
+
+		By("Notifier status should be updated to k8s")
+		Eventually(func() map[string]alert.Alert {
+			n := &merlinv1.Notifier{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: testNotifier.Name}, n)).Should(Succeed())
+			fmt.Println(n.Status)
+			return n.Status.Alerts
+		}, time.Second*3, time.Millisecond*200).ShouldNot(HaveKey(alertKey))
+
+		By("Notifier cache should remove the alert")
+		Expect(notifier.Status.Alerts).ShouldNot(HaveKey(alertKey))
 	})
 })

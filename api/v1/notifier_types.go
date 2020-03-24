@@ -99,7 +99,9 @@ func (n *Notifier) Notify(client *http.Client) {
 					a.Status = alert.StatusError
 				} else {
 					a.Error = ""
-					a.Status = alert.StatusFiring
+					if a.Status == alert.StatusPending {
+						a.Status = alert.StatusFiring
+					}
 				}
 			} else {
 				// TODO: add pagerduty, note if they'll co-exists then we'll need other Status/Error fields for PagerDuty

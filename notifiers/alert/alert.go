@@ -36,7 +36,7 @@ type Alert struct {
 	// MessageTemplate is the message template for the alert
 	MessageTemplate string `json:"-"`
 	// ViolationMessage is the message for the violation
-	ViolationMessage string `json:"-"`
+	ViolationMessage string `json:"violationMessage"`
 	// ResourceKind is the resource's kind that has issue, e.g., hpa, pdb, pod, service, etc.
 	ResourceKind string `json:"resourceKind"`
 	// ResourceName is the resource's name, with namespace, same as types.NamespacedName.String()

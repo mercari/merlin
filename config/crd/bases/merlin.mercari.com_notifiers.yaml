@@ -93,6 +93,9 @@ spec:
                     description: Suppressed means if this notification has been suppressed,
                       can be used to temporary reduce the noise
                     type: boolean
+                  violationMessage:
+                    description: ViolationMessage is the message for the violation
+                    type: string
                 required:
                 - error
                 - resourceKind
@@ -100,6 +103,7 @@ spec:
                 - severity
                 - status
                 - suppressed
+                - violationMessage
                 type: object
               description: Alerts are the map of alerts currently firing/pending for
                 objects violate the rule

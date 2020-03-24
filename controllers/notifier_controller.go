@@ -46,8 +46,8 @@ type NotifierReconciler struct {
 	HttpClient *http.Client
 }
 
-// +kubebuilder:rbac:groups=merlin.mercari.com,resources=notifis,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=merlin.mercari.com,resources=notifis/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=merlin.mercari.com,resources=notifiers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=merlin.mercari.com,resources=notifiers/status,verbs=get;update;patch
 
 func (r *NotifierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
@@ -71,7 +71,7 @@ func (r *NotifierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{RequeueAfter: time.Second * time.Duration(notifier.Spec.NotifyInterval)}, nil
 	}
 
-	l.Info("Notifier Status", "alerts", notifierCache.Status.ListAlerts())
+	l.Info("Notifier Status", "alerts", notifierCache.Status)
 	notifierCache.Notify(r.HttpClient)
 	notifier.Status = notifierCache.Status
 
