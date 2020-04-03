@@ -58,7 +58,8 @@ type RuleHPAReplicaPercentage struct {
 }
 
 func (r RuleHPAReplicaPercentage) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource types.NamespacedName, notifiers map[string]*Notifier) error {
-	l.Info("Evaluating HPA replica percentage", "name", r.Name)
+	// TODO: respect selector
+	l.Info("Evaluating", "name", r.Name, "rule", GetStructName(r))
 	var hpas autoscalingv1.HorizontalPodAutoscalerList
 
 	// empty resource is from rule changed, check resources for new status

@@ -58,7 +58,7 @@ type ClusterRuleNamespaceRequiredLabel struct {
 }
 
 func (r ClusterRuleNamespaceRequiredLabel) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource types.NamespacedName, notifiers map[string]*Notifier) error {
-	l.Info("Evaluating Namespace required label", "name", r.Name)
+	l.Info("Evaluating", "name", r.Name, "rule", GetStructName(r))
 	var namespaces corev1.NamespaceList
 
 	// empty resource is from rule changed, check resources for new status

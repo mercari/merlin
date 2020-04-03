@@ -65,8 +65,10 @@ func (r *NotifierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	notifierCache, ok := r.Notifiers[req.Name]
 	if !ok { // new notifier is created, just add to cache and waits for next iteration to send notifications.
-		l.Info("New notifier is created", "notifier", req.Name)
-		notifier.Status = merlinv1.NotifierStatus{Alerts: map[string]alert.Alert{}}
+		l.Info("Manager restarted or new notifier is created", "notifier", req.Name, "status", notifier.Status)
+		if notifier.Status.Alerts == nil {
+			notifier.Status = merlinv1.NotifierStatus{Alerts: map[string]alert.Alert{}}
+		}
 		r.Notifiers[req.Name] = &notifier
 		return ctrl.Result{RequeueAfter: time.Second * time.Duration(notifier.Spec.NotifyInterval)}, nil
 	}

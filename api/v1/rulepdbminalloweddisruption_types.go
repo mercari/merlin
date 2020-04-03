@@ -64,7 +64,7 @@ type RulePDBMinAllowedDisruption struct {
 }
 
 func (r RulePDBMinAllowedDisruption) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource types.NamespacedName, notifiers map[string]*Notifier) error {
-	l.Info("Evaluating PDB invalid selector", "name", r.Name)
+	l.Info("Evaluating", "name", r.Name, "rule", GetStructName(r))
 	var pdbs policyv1beta1.PodDisruptionBudgetList
 
 	// empty resource is from rule changed, check resources for new status
@@ -117,10 +117,8 @@ func (r RulePDBMinAllowedDisruption) Evaluate(ctx context.Context, cli client.Cl
 		namespacedName := types.NamespacedName{Namespace: p.Namespace, Name: p.Name}
 		pods := corev1.PodList{}
 		if err := cli.List(ctx, &pods, &client.ListOptions{
-			Namespace: p.Namespace,
-			Raw: &metav1.ListOptions{
-				LabelSelector: labels.Set(p.Spec.Selector.MatchLabels).String(),
-			},
+			Namespace:     p.Namespace,
+			LabelSelector: labels.SelectorFromSet(labels.Set(p.Spec.Selector.MatchLabels)),
 		}); err != nil && client.IgnoreNotFound(err) != nil {
 			return err
 		}

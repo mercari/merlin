@@ -58,7 +58,7 @@ type ClusterRuleHPAInvalidScaleTargetRef struct {
 }
 
 func (r ClusterRuleHPAInvalidScaleTargetRef) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource types.NamespacedName, notifiers map[string]*Notifier) error {
-	l.Info("Evaluating HPA ScaleTargetRef validity")
+	l.Info("Evaluating", "name", r.Name, "rule", GetStructName(r))
 	var hpas autoscalingv1.HorizontalPodAutoscalerList
 
 	// resource == nil is from rule changed, check resources for new status

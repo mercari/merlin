@@ -62,7 +62,7 @@ type ClusterRulePDBMinAllowedDisruption struct {
 }
 
 func (r ClusterRulePDBMinAllowedDisruption) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource types.NamespacedName, notifiers map[string]*Notifier) error {
-	l.Info("Evaluating PDB invalid selector", "name", r.Name)
+	l.Info("Evaluating", "name", r.Name, "rule", GetStructName(r))
 	var pdbs policyv1beta1.PodDisruptionBudgetList
 
 	// empty resource is from rule changed, check resources for new status
