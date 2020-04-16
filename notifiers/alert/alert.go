@@ -8,12 +8,12 @@ import (
 type Status string
 
 const (
-	MessageTemplateVariableSeverity         = "{{.Severity}}"
-	MessageTemplateVariableResourceKind     = "{{.ResourceKind}}"
-	MessageTemplateVariableResourceName     = "{{.ResourceName}}"
-	MessageTemplateVariableViolationMessage = "{{.ViolationMessage}}"
+	MessageTemplateVariableSeverity     = "{{.Severity}}"
+	MessageTemplateVariableResourceKind = "{{.ResourceKind}}"
+	MessageTemplateVariableResourceName = "{{.ResourceName}}"
+	MessageTemplateVariableMessage      = "{{.Message}}"
 
-	DefaultMessageTemplate = "[" + MessageTemplateVariableSeverity + "] " + MessageTemplateVariableResourceKind + " `" + MessageTemplateVariableResourceName + "` " + MessageTemplateVariableViolationMessage
+	DefaultMessageTemplate = "[" + MessageTemplateVariableSeverity + "] " + MessageTemplateVariableResourceKind + " `" + MessageTemplateVariableResourceName + "` " + MessageTemplateVariableMessage
 
 	StatusPending    Status = "pending"    // pending to send alert
 	StatusFiring     Status = "firing"     // alert currently firing
@@ -35,8 +35,8 @@ type Alert struct {
 	Severity Severity `json:"severity"`
 	// MessageTemplate is the message template for the alert
 	MessageTemplate string `json:"-"`
-	// ViolationMessage is the message for the violation
-	ViolationMessage string `json:"violationMessage"`
+	// Message is the message for the violation
+	Message string `json:"message"`
 	// ResourceKind is the resource's kind that has issue, e.g., hpa, pdb, pod, service, etc.
 	ResourceKind string `json:"resourceKind"`
 	// ResourceName is the resource's name, with namespace, same as types.NamespacedName.String()
@@ -53,10 +53,10 @@ func (a Alert) ParseMessage() (string, error) {
 		messageTemplate = DefaultMessageTemplate
 	}
 	messageVariables := MessageTemplateVariables{
-		Severity:         a.Severity,
-		ResourceKind:     a.ResourceKind,
-		ResourceName:     a.ResourceName,
-		ViolationMessage: a.ViolationMessage,
+		Severity:     a.Severity,
+		ResourceKind: a.ResourceKind,
+		ResourceName: a.ResourceName,
+		Message:      a.Message,
 	}
 	t, err := template.New("msg").Parse(messageTemplate)
 	if err != nil {
@@ -70,10 +70,10 @@ func (a Alert) ParseMessage() (string, error) {
 }
 
 type MessageTemplateVariables struct {
-	Severity         Severity
-	ResourceKind     string
-	ResourceName     string
-	ViolationMessage string
+	Severity     Severity
+	ResourceKind string
+	ResourceName string
+	Message      string
 }
 
 // Severity indicates the severity of the alert

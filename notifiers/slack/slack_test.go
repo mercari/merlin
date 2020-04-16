@@ -2,13 +2,14 @@ package slack
 
 import (
 	"encoding/json"
-	"github.com/kouzoh/merlin/notifiers/alert"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/kouzoh/merlin/notifiers/alert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSlack_SendAlert(t *testing.T) {
@@ -28,10 +29,10 @@ func TestSlack_SendAlert(t *testing.T) {
 		{
 			desc: "regular alert should get proper attachments",
 			a: alert.Alert{
-				Severity:         alert.SeverityWarning,
-				ResourceKind:     "Kind",
-				ResourceName:     "NS/Name",
-				ViolationMessage: "msg",
+				Severity:     alert.SeverityWarning,
+				ResourceKind: "Kind",
+				ResourceName: "NS/Name",
+				Message:      "msg",
 			},
 			want: []Attachment{
 				{
@@ -59,9 +60,9 @@ func TestSlack_SendAlert(t *testing.T) {
 		{
 			desc: "Default severity alert should get info",
 			a: alert.Alert{
-				ResourceKind:     "Kind",
-				ResourceName:     "NS/Name",
-				ViolationMessage: "msg",
+				ResourceKind: "Kind",
+				ResourceName: "NS/Name",
+				Message:      "msg",
 			},
 			want: []Attachment{
 				{
@@ -89,10 +90,10 @@ func TestSlack_SendAlert(t *testing.T) {
 		{
 			desc: "Recovered alert should get green color",
 			a: alert.Alert{
-				Status:           alert.StatusRecovering,
-				ResourceKind:     "Kind",
-				ResourceName:     "NS/Name",
-				ViolationMessage: "msg",
+				Status:       alert.StatusRecovering,
+				ResourceKind: "Kind",
+				ResourceName: "NS/Name",
+				Message:      "msg",
 			},
 			want: []Attachment{
 				{

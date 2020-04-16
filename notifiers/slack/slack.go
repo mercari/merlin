@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/kouzoh/merlin/notifiers/alert"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/kouzoh/merlin/notifiers/alert"
 )
 
 type BlockType string
@@ -59,8 +60,8 @@ type BlockSectionField struct {
 }
 
 func (s *Slack) SendAlert(client *http.Client, a alert.Alert) error {
-	if a.ResourceKind == "" || a.ResourceName == "" || a.ViolationMessage == "" {
-		return fmt.Errorf("alert's ResourceKind, ResourceName, and ViolationMessage are required")
+	if a.ResourceKind == "" || a.ResourceName == "" || a.Message == "" {
+		return fmt.Errorf("alert's ResourceKind, ResourceName, and Message are required")
 	}
 	if a.Severity == alert.SeverityDefault {
 		a.Severity = s.Severity

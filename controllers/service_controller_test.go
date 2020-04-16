@@ -2,6 +2,9 @@ package controllers
 
 import (
 	"context"
+	"strings"
+	"time"
+
 	"github.com/kouzoh/merlin/notifiers/alert"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -10,8 +13,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"strings"
-	"time"
 
 	// +kubebuilder:scaffold:imports
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
@@ -59,7 +60,7 @@ var _ = Describe("ServiceControllerTests", func() {
 			if !isNotifierCreated {
 				Expect(k8sClient.Create(ctx, notifier)).Should(Succeed())
 				Eventually(func() map[string]*merlinv1.Notifier {
-					return notifierReconciler.Notifiers
+					return notifierReconciler.NotifiersCache.Notifiers
 				}, time.Second*5, time.Millisecond*200).Should(HaveKey(notifier.Name))
 			}
 			isNotifierCreated = true
@@ -94,7 +95,7 @@ var _ = Describe("ServiceControllerTests", func() {
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).Should(HaveKey(alertKey))
 			// alert should be added to notifier status
-			Expect(notifierReconciler.Notifiers[notifier.Name].Status.Alerts).Should(HaveKey(alertKey))
+			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).Should(HaveKey(alertKey))
 		})
 
 		It("TestDeleteServiceShouldRemoveAlert", func() {
@@ -110,7 +111,7 @@ var _ = Describe("ServiceControllerTests", func() {
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).ShouldNot(HaveKey(alertKey))
 			// alert should be added to notifier status
-			Expect(notifierReconciler.Notifiers[notifier.Name].Status.Alerts).ShouldNot(HaveKey(alertKey))
+			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).ShouldNot(HaveKey(alertKey))
 		})
 	})
 

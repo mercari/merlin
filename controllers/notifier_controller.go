@@ -17,16 +17,17 @@ package controllers
 
 import (
 	"context"
+	"net/http"
+	"time"
+
 	"github.com/go-logr/logr"
 	"github.com/kouzoh/merlin/notifiers/alert"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"net/http"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sync"
-	"time"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
 )
@@ -38,10 +39,7 @@ type NotifierReconciler struct {
 	Scheme *runtime.Scheme
 	// Notifiers stores the notifiers as cache, this will be updated when any notifier updates happen,
 	// and also servers as cache so we dont need to get list of notifiers every time
-	Notifiers map[string]*merlinv1.Notifier
-	// Generations stores the rule generation, to be used for event filter to determine if events are from Reconciler
-	// This is required since status updates also increases generation, so we cant use metadata's generation.
-	Generations *sync.Map
+	NotifiersCache *merlinv1.NotifiersCache
 	// HttpClient is the client for notifier to send alerts to external systems
 	HttpClient *http.Client
 }
@@ -60,38 +58,39 @@ func (r *NotifierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			return ctrl.Result{}, nil
 		}
 		l.Error(err, "failed to get notifier")
-		return ctrl.Result{RequeueAfter: RequeueIntervalForError}, err
+		return ctrl.Result{RequeueAfter: requeueIntervalForError()}, err
 	}
 
-	notifierCache, ok := r.Notifiers[req.Name]
+	_, ok := r.NotifiersCache.Notifiers[req.Name]
 	if !ok { // new notifier is created, just add to cache and waits for next iteration to send notifications.
 		l.Info("Manager restarted or new notifier is created", "notifier", req.Name, "status", notifier.Status)
 		if notifier.Status.Alerts == nil {
 			notifier.Status = merlinv1.NotifierStatus{Alerts: map[string]alert.Alert{}}
 		}
-		r.Notifiers[req.Name] = &notifier
+		r.NotifiersCache.Notifiers[req.Name] = &notifier
+		r.NotifiersCache.IsReady = true
 		return ctrl.Result{RequeueAfter: time.Second * time.Duration(notifier.Spec.NotifyInterval)}, nil
 	}
 
-	l.Info("Notifier Status", "alerts", notifierCache.Status)
-	notifierCache.Notify(r.HttpClient)
-	notifier.Status = notifierCache.Status
+	l.V(1).Info("Notifier Status", "alerts", r.NotifiersCache.Notifiers[req.Name].Status)
+	r.NotifiersCache.Notifiers[req.Name].Notify(r.HttpClient)
+	notifier.Status = r.NotifiersCache.Notifiers[req.Name].Status
 
-	r.Generations.Store(notifier.Name, notifier.Generation+1)
-	if err := r.Client.Update(ctx, &notifier); err != nil {
+	if err := r.Status().Update(ctx, &notifier); err != nil {
 		l.Error(err, "unable to update status")
-		return ctrl.Result{RequeueAfter: RequeueIntervalForError}, err
+		return ctrl.Result{RequeueAfter: requeueIntervalForError()}, err
 	}
 	return ctrl.Result{RequeueAfter: time.Second * time.Duration(notifier.Spec.NotifyInterval)}, nil
 }
 
 func (r *NotifierReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	l := r.Log.WithName("SetupWithManager")
-	r.Notifiers = map[string]*merlinv1.Notifier{}
-	r.Generations = &sync.Map{}
+	r.NotifiersCache = &merlinv1.NotifiersCache{
+		Notifiers: map[string]*merlinv1.Notifier{},
+	}
 	l.Info("initialize manager")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&merlinv1.Notifier{}).
-		WithEventFilter(GetPredicateFuncs(l, r.Generations)).
+		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		Complete(r)
 }

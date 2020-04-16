@@ -2,6 +2,9 @@ package controllers
 
 import (
 	"context"
+	"strings"
+	"time"
+
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
 	"github.com/kouzoh/merlin/notifiers/alert"
 	. "github.com/onsi/ginkgo"
@@ -13,8 +16,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"strings"
-	"time"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -64,7 +65,7 @@ var _ = Describe("HPAControllerTests", func() {
 			if !isNotifierCreated {
 				Expect(k8sClient.Create(ctx, notifier)).Should(Succeed())
 				Eventually(func() map[string]*merlinv1.Notifier {
-					return notifierReconciler.Notifiers
+					return notifierReconciler.NotifiersCache.Notifiers
 				}, time.Second*5, time.Millisecond*200).Should(HaveKey(notifier.Name))
 			}
 			isNotifierCreated = true
@@ -94,7 +95,7 @@ var _ = Describe("HPAControllerTests", func() {
 				return r.Status.Violations
 			}, time.Second*3, time.Millisecond*200).Should(HaveKey(hpaNamespacedName.String()))
 			// alert should be added to notifier status
-			Expect(notifierReconciler.Notifiers[notifier.Name].Status.Alerts).Should(HaveKey(alertKey))
+			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).Should(HaveKey(alertKey))
 			Eventually(func() map[string]alert.Alert {
 				n := &merlinv1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
@@ -138,7 +139,7 @@ var _ = Describe("HPAControllerTests", func() {
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).ShouldNot(HaveKey(alertKey))
-			Expect(notifierReconciler.Notifiers[notifier.Name].Status.Alerts).ShouldNot(HaveKey(alertKey))
+			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).ShouldNot(HaveKey(alertKey))
 		})
 	})
 })

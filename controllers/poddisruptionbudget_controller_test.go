@@ -3,6 +3,9 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/kouzoh/merlin/notifiers/alert"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -13,8 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"strings"
-	"time"
 
 	// +kubebuilder:scaffold:imports
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
@@ -60,7 +61,7 @@ var _ = Describe("PDBControllerTests", func() {
 			if !isNotifierCreated {
 				Expect(k8sClient.Create(ctx, notifier)).Should(Succeed())
 				Eventually(func() map[string]*merlinv1.Notifier {
-					return notifierReconciler.Notifiers
+					return notifierReconciler.NotifiersCache.Notifiers
 				}, time.Second*5, time.Millisecond*200).Should(HaveKey(notifier.Name))
 			}
 			isNotifierCreated = true
@@ -95,7 +96,7 @@ var _ = Describe("PDBControllerTests", func() {
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).Should(HaveKey(alertKey))
 			// alert should be added to notifier status
-			Expect(notifierReconciler.Notifiers[notifier.Name].Status.Alerts).Should(HaveKey(alertKey))
+			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).Should(HaveKey(alertKey))
 		})
 	})
 
@@ -137,7 +138,7 @@ var _ = Describe("PDBControllerTests", func() {
 			if !isNotifierCreated {
 				Expect(k8sClient.Create(ctx, notifier)).Should(Succeed())
 				Eventually(func() map[string]*merlinv1.Notifier {
-					return notifierReconciler.Notifiers
+					return notifierReconciler.NotifiersCache.Notifiers
 				}, time.Second*5, time.Millisecond*200).Should(HaveKey(notifier.Name))
 			}
 			isNotifierCreated = true
@@ -165,14 +166,14 @@ var _ = Describe("PDBControllerTests", func() {
 				r := &merlinv1.ClusterRulePDBMinAllowedDisruption{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: rule.Name}, r)).Should(Succeed())
 				return r.Status.Violations
-			}, time.Second*3, time.Millisecond*200).ShouldNot(HaveKey(pdbNamespacedName.String()))
+			}, time.Second*3, time.Millisecond*200).Should(HaveKey(pdbNamespacedName.String()))
 			Eventually(func() map[string]alert.Alert {
 				n := &merlinv1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).Should(HaveKey(alertKey))
 			// alert should be added to notifier status
-			Expect(notifierReconciler.Notifiers[notifier.Name].Status.Alerts).Should(HaveKey(alertKey))
+			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).Should(HaveKey(alertKey))
 		})
 
 		It("TestCreateEnoughPodsForRuleShouldNotGetViolation", func() {
@@ -207,7 +208,7 @@ var _ = Describe("PDBControllerTests", func() {
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).ShouldNot(HaveKey(alertKey))
 			// alert should be added to notifier status
-			Expect(notifierReconciler.Notifiers[notifier.Name].Status.Alerts).ShouldNot(HaveKey(alertKey))
+			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).ShouldNot(HaveKey(alertKey))
 		})
 	})
 
@@ -252,7 +253,7 @@ var _ = Describe("PDBControllerTests", func() {
 			if !isNotifierCreated {
 				Expect(k8sClient.Create(ctx, notifier)).Should(Succeed())
 				Eventually(func() map[string]*merlinv1.Notifier {
-					return notifierReconciler.Notifiers
+					return notifierReconciler.NotifiersCache.Notifiers
 				}, time.Second*5, time.Millisecond*200).Should(HaveKey(notifier.Name))
 			}
 			isNotifierCreated = true
@@ -286,14 +287,14 @@ var _ = Describe("PDBControllerTests", func() {
 				r := &merlinv1.RulePDBMinAllowedDisruption{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: rule.Name}, r)).Should(Succeed())
 				return r.Status.Violations
-			}, time.Second*3, time.Millisecond*200).ShouldNot(HaveKey(pdbNamespacedName.String()))
+			}, time.Second*3, time.Millisecond*200).Should(HaveKey(pdbNamespacedName.String()))
 			Eventually(func() map[string]alert.Alert {
 				n := &merlinv1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).Should(HaveKey(alertKey))
 			// alert should be added to notifier status
-			Expect(notifierReconciler.Notifiers[notifier.Name].Status.Alerts).Should(HaveKey(alertKey))
+			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).Should(HaveKey(alertKey))
 		})
 
 		It("TestCreateEnoughPodsForRuleShouldNotGetViolation", func() {
@@ -328,7 +329,7 @@ var _ = Describe("PDBControllerTests", func() {
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).ShouldNot(HaveKey(alertKey))
 			// alert should be added to notifier status
-			Expect(notifierReconciler.Notifiers[notifier.Name].Status.Alerts).ShouldNot(HaveKey(alertKey))
+			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).ShouldNot(HaveKey(alertKey))
 		})
 	})
 

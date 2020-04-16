@@ -7,55 +7,15 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - autoscalingv1
-  resources:
-  - hpa
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - corev1
-  resources:
-  - pods
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - merlin.mercari.com
-  resources:
-  - clusterrulepdbinvalidselectors
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - merlin.mercari.com
-  resources:
-  - clusterrulepdbinvalidselectors/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - merlin.mercari.com
+  - autoscaling
   resources:
   - horizontalpodautoscalers
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
-  - merlin.mercari.com
+  - autoscaling
   resources:
   - horizontalpodautoscalers/status
   verbs:
@@ -63,9 +23,23 @@ rules:
   - patch
   - update
 - apiGroups:
-  - merlin.mercari.com
+  - ""
   resources:
   - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - namespaces/status
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - pods
   verbs:
   - create
   - delete
@@ -75,13 +49,27 @@ rules:
   - update
   - watch
 - apiGroups:
-  - merlin.mercari.com
+  - ""
   resources:
-  - namespaces/status
+  - pods/status
   verbs:
   - get
   - patch
   - update
+- apiGroups:
+  - ""
+  resources:
+  - service
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - service/status
+  verbs:
+  - get
 - apiGroups:
   - merlin.mercari.com
   resources:
@@ -103,42 +91,16 @@ rules:
   - patch
   - update
 - apiGroups:
-  - merlin.mercari.com
+  - policy
   resources:
-  - pods
+  - poddisruptionbudgets
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
-  - merlin.mercari.com
+  - policy
   resources:
-  - pods/status
+  - poddisruptionbudgets/status
   verbs:
   - get
-  - patch
-  - update
-- apiGroups:
-  - merlin.mercari.com
-  resources:
-  - service
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - merlin.mercari.com
-  resources:
-  - service/status
-  verbs:
-  - get
-  - patch
-  - update

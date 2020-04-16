@@ -15,6 +15,8 @@ spec:
     plural: rulehpareplicapercentages
     singular: rulehpareplicapercentage
   scope: Namespaced
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
       description: RuleHPAReplicaPercentage is the Schema for the rulehpareplicapercentage
@@ -41,7 +43,7 @@ spec:
               properties:
                 customMessageTemplate:
                   description: CustomMessageTemplate can used for customized message,
-                    variables can be used are "ResourceName, Severity, and ViolationMessage"
+                    variables can be used are "ResourceName, Severity, and Message"
                   type: string
                 notifiers:
                   description: Notifiers is the list of notifiers for this notification

@@ -17,11 +17,11 @@ package v1
 
 import (
 	"context"
+	"fmt"
+
 	"github.com/go-logr/logr"
-	"github.com/kouzoh/merlin/notifiers/alert"
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -45,8 +45,17 @@ type ClusterRulePDBInvalidSelectorList struct {
 	Items           []ClusterRulePDBInvalidSelector `json:"items"`
 }
 
+func (c ClusterRulePDBInvalidSelectorList) ListItems() []Rule {
+	var items []Rule
+	for _, i := range c.Items {
+		items = append(items, &i)
+	}
+	return items
+}
+
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
+// +kubebuilder:subresource:status
 
 // ClusterRulePDBInvalidSelector is the Schema for the clusterrulepdbinvalidselectors API
 type ClusterRulePDBInvalidSelector struct {
@@ -57,92 +66,73 @@ type ClusterRulePDBInvalidSelector struct {
 	Status RuleStatus                        `json:"status,omitempty"`
 }
 
-func (r ClusterRulePDBInvalidSelector) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource types.NamespacedName, notifiers map[string]*Notifier) error {
-	l.Info("Evaluating", "name", r.Name, "rule", GetStructName(r))
-	var pdbs policyv1beta1.PodDisruptionBudgetList
+func (c ClusterRulePDBInvalidSelector) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, object interface{}) (isViolated bool, message string, err error) {
+	pdb, ok := object.(policyv1beta1.PodDisruptionBudget)
+	if !ok {
+		err = fmt.Errorf("unable to convert object to type %s", GetStructName(pdb))
+		return
+	}
+	l.Info("evaluating", GetStructName(pdb), pdb.Name)
 
-	// empty resource is from rule changed, check resources for new status
-	if resource == (types.NamespacedName{}) {
-		if err := cli.List(ctx, &pdbs); err != nil {
-			if apierrs.IsNotFound(err) {
-				l.Info("No resources found for evaluation", "name", r.Name)
-				return nil
-			}
-			return err
-		}
+	pods := corev1.PodList{}
+	if err = cli.List(ctx, &pods, &client.ListOptions{
+		Namespace:     pdb.Namespace,
+		LabelSelector: labels.Set(pdb.Spec.Selector.MatchLabels).AsSelector(),
+	}); err != nil && client.IgnoreNotFound(err) != nil {
+		return
+	}
+	if len(pods.Items) <= 0 {
+		isViolated = true
+		message = "PDB has no matched pods for the selector"
 	} else {
-		pdb := policyv1beta1.PodDisruptionBudget{}
-		err := cli.Get(ctx, resource, &pdb)
-		if apierrs.IsNotFound(err) {
-			// resource not found, wont add to the list, and removed it from alert
-			l.Info("resource not found - event is from deletion", "name", resource.String())
-			r.Status.SetViolation(resource, false)
-			newAlert := alert.Alert{
-				Suppressed:       r.Spec.Notification.Suppressed,
-				Severity:         r.Spec.Notification.Severity,
-				MessageTemplate:  r.Spec.Notification.CustomMessageTemplate,
-				ViolationMessage: "recovered since resource is deleted",
-				ResourceKind:     GetStructName(pdb),
-				ResourceName:     resource.String(),
-			}
-			for _, n := range r.Spec.Notification.Notifiers {
-				notifier, ok := notifiers[n]
-				if !ok {
-					l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
-					continue
-				}
-				notifier.SetAlert(r.Kind, r.Name, newAlert, false)
-			}
-		} else if err != nil {
-			return err
-		} else {
-			pdbs.Items = append(pdbs.Items, pdb)
-		}
+		message = "PDB has pods for the selector"
 	}
+	return
+}
 
-	for _, p := range pdbs.Items {
-		namespacedName := types.NamespacedName{Namespace: p.Namespace, Name: p.Name}
-		pods := corev1.PodList{}
-		if err := cli.List(ctx, &pods, &client.ListOptions{
-			Namespace:     p.Namespace,
-			LabelSelector: labels.Set(p.Spec.Selector.MatchLabels).AsSelector(),
-		}); err != nil && client.IgnoreNotFound(err) != nil {
-			return err
-		}
-		isViolated := false
-		if len(pods.Items) == 0 && !IsStringInSlice(r.Spec.IgnoreNamespaces, p.Namespace) {
-			l.Info("resource has violation", "resource", namespacedName.String())
-			isViolated = true
-		}
+func (c ClusterRulePDBInvalidSelector) GetStatus() RuleStatus {
+	return c.Status
+}
+func (c ClusterRulePDBInvalidSelector) List() RuleList {
+	return &ClusterRulePDBInvalidSelectorList{}
+}
 
-		r.Status.SetViolation(namespacedName, isViolated)
-		newAlert := alert.Alert{
-			Suppressed:       r.Spec.Notification.Suppressed,
-			Severity:         r.Spec.Notification.Severity,
-			MessageTemplate:  r.Spec.Notification.CustomMessageTemplate,
-			ViolationMessage: "PDB has invalid selector",
-			ResourceKind:     GetStructName(p),
-			ResourceName:     namespacedName.String(),
-		}
-		for _, n := range r.Spec.Notification.Notifiers {
-			notifier, ok := notifiers[n]
-			if !ok {
-				l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
-				continue
-			}
-			notifier.SetAlert(r.Kind, r.Name, newAlert, isViolated)
-		}
-	}
+func (c ClusterRulePDBInvalidSelector) IsNamespaceIgnored(namespace string) bool {
+	return IsStringInSlice(c.Spec.IgnoreNamespaces, namespace)
+}
 
-	if err := cli.Update(ctx, &r); err != nil {
-		l.Error(err, "unable to update rule status", "rule", r.Name)
-		return err
-	}
+func (c ClusterRulePDBInvalidSelector) GetNamespacedRuleList() RuleList {
 	return nil
 }
 
-func (r ClusterRulePDBInvalidSelector) GetStatus() RuleStatus {
-	return r.Status
+func (c ClusterRulePDBInvalidSelector) GetNotification() Notification {
+	return c.Spec.Notification
+}
+
+func (c *ClusterRulePDBInvalidSelector) SetViolationStatus(name types.NamespacedName, isViolated bool) {
+	c.Status.SetViolation(name, isViolated)
+}
+
+func (c ClusterRulePDBInvalidSelector) GetResourceList() ResourceList {
+	return &policyv1beta1PDBList{}
+}
+
+func (c ClusterRulePDBInvalidSelector) IsNamespacedRule() bool {
+	return false
+}
+
+func (c ClusterRulePDBInvalidSelector) GetSelector() *Selector {
+	return nil
+}
+
+func (c ClusterRulePDBInvalidSelector) GetObjectNamespacedName(object interface{}) (namespacedName types.NamespacedName, err error) {
+	pdb, ok := object.(policyv1beta1.PodDisruptionBudget)
+	if !ok {
+		err = fmt.Errorf("unable to convert object to type %T", pdb)
+		return
+	}
+	namespacedName = types.NamespacedName{Namespace: pdb.Namespace, Name: pdb.Name}
+	return
 }
 
 func init() {

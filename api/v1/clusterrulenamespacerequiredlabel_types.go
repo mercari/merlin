@@ -17,10 +17,10 @@ package v1
 
 import (
 	"context"
+	"fmt"
+
 	"github.com/go-logr/logr"
-	"github.com/kouzoh/merlin/notifiers/alert"
 	corev1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,8 +45,17 @@ type ClusterRuleNamespaceRequiredLabelList struct {
 	Items           []ClusterRuleNamespaceRequiredLabel `json:"items"`
 }
 
+func (c ClusterRuleNamespaceRequiredLabelList) ListItems() []Rule {
+	var items []Rule
+	for _, i := range c.Items {
+		items = append(items, &i)
+	}
+	return items
+}
+
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
+// +kubebuilder:subresource:status
 
 // ClusterRuleNamespaceRequiredLabel is the Schema for the clusterrulenamespacerequiredlabels API
 type ClusterRuleNamespaceRequiredLabel struct {
@@ -57,89 +66,67 @@ type ClusterRuleNamespaceRequiredLabel struct {
 	Status RuleStatus                            `json:"status,omitempty"`
 }
 
-func (r ClusterRuleNamespaceRequiredLabel) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource types.NamespacedName, notifiers map[string]*Notifier) error {
-	l.Info("Evaluating", "name", r.Name, "rule", GetStructName(r))
-	var namespaces corev1.NamespaceList
-
-	// empty resource is from rule changed, check resources for new status
-	if resource == (types.NamespacedName{}) {
-		if err := cli.List(ctx, &namespaces); err != nil {
-			if apierrs.IsNotFound(err) {
-				l.Info("No resources found for evaluation", "name", r.Name)
-				return nil
-			}
-			return err
-		}
-	} else {
-		ns := corev1.Namespace{}
-		err := cli.Get(ctx, resource, &ns)
-		if apierrs.IsNotFound(err) {
-			// resource not found, wont add to the list, and removed it from alert
-			l.Info("resource not found - event is from deletion", "name", resource.String())
-			r.Status.SetViolation(resource, false)
-			newAlert := alert.Alert{
-				Suppressed:       r.Spec.Notification.Suppressed,
-				Severity:         r.Spec.Notification.Severity,
-				MessageTemplate:  r.Spec.Notification.CustomMessageTemplate,
-				ViolationMessage: "recovered since resource is deleted",
-				ResourceKind:     GetStructName(ns),
-				ResourceName:     resource.String(),
-			}
-			for _, n := range r.Spec.Notification.Notifiers {
-				notifier, ok := notifiers[n]
-				if !ok {
-					l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
-					continue
-				}
-				notifier.SetAlert(r.Kind, r.Name, newAlert, false)
-			}
-		} else if err != nil {
-			return err
-		} else {
-			namespaces.Items = append(namespaces.Items, ns)
-		}
+func (c ClusterRuleNamespaceRequiredLabel) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, object interface{}) (isViolated bool, message string, err error) {
+	namespace, ok := object.(corev1.Namespace)
+	if !ok {
+		err = fmt.Errorf("unable to convert object to type %T", namespace)
+		return
 	}
+	l.Info("evaluating", GetStructName(namespace), namespace.Name)
 
-	for _, ns := range namespaces.Items {
-		namespacedName := types.NamespacedName{Namespace: ns.Namespace, Name: ns.Name}
-		violation, err := r.Spec.Label.Validate(ns.GetLabels())
-		if err != nil {
-			return err
-		}
-
-		isViolated := false
-		if violation != "" && !IsStringInSlice(r.Spec.IgnoreNamespaces, ns.Name) {
-			l.Info("resource has violation", "resource", namespacedName.String())
-			isViolated = true
-		}
-		r.Status.SetViolation(namespacedName, isViolated)
-		newAlert := alert.Alert{
-			Suppressed:       r.Spec.Notification.Suppressed,
-			Severity:         r.Spec.Notification.Severity,
-			MessageTemplate:  r.Spec.Notification.CustomMessageTemplate,
-			ViolationMessage: violation,
-			ResourceKind:     GetStructName(ns),
-			ResourceName:     namespacedName.String(),
-		}
-		for _, n := range r.Spec.Notification.Notifiers {
-			notifier, ok := notifiers[n]
-			if !ok {
-				l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
-				continue
-			}
-			notifier.SetAlert(r.Kind, r.Name, newAlert, isViolated)
-		}
+	if message, err = c.Spec.Label.Validate(namespace.GetLabels()); err != nil {
+		return
 	}
-
-	if err := cli.Update(ctx, &r); err != nil {
-		l.Error(err, "unable to update rule status", "rule", r.Name)
-		return err
+	if message != "" {
+		isViolated = true
 	}
+	return
+}
+
+func (c ClusterRuleNamespaceRequiredLabel) GetStatus() RuleStatus {
+	return c.Status
+}
+
+func (c ClusterRuleNamespaceRequiredLabel) List() RuleList {
+	return &ClusterRuleNamespaceRequiredLabelList{}
+}
+
+func (c ClusterRuleNamespaceRequiredLabel) IsNamespaceIgnored(namespace string) bool {
+	return IsStringInSlice(c.Spec.IgnoreNamespaces, namespace)
+}
+
+func (c ClusterRuleNamespaceRequiredLabel) GetNamespacedRuleList() RuleList {
 	return nil
 }
 
-func (r ClusterRuleNamespaceRequiredLabel) GetStatus() RuleStatus {
-	return r.Status
+func (c ClusterRuleNamespaceRequiredLabel) GetNotification() Notification {
+	return c.Spec.Notification
+}
+
+func (c *ClusterRuleNamespaceRequiredLabel) SetViolationStatus(name types.NamespacedName, isViolated bool) {
+	c.Status.SetViolation(name, isViolated)
+}
+
+func (c ClusterRuleNamespaceRequiredLabel) GetResourceList() ResourceList {
+	return &coreV1NamespaceList{}
+}
+
+func (c ClusterRuleNamespaceRequiredLabel) IsNamespacedRule() bool {
+	return false
+}
+
+func (c ClusterRuleNamespaceRequiredLabel) GetSelector() *Selector {
+	return nil
+}
+
+func (c ClusterRuleNamespaceRequiredLabel) GetObjectNamespacedName(object interface{}) (namespacedName types.NamespacedName, err error) {
+	namespace, ok := object.(corev1.Namespace)
+	if !ok {
+		err = fmt.Errorf("unable to convert object to type %T", namespace)
+		return
+	}
+	namespacedName = types.NamespacedName{Namespace: namespace.Namespace, Name: namespace.Name}
+	return
 }
 
 func init() {

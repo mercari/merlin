@@ -17,11 +17,12 @@ package v1
 
 import (
 	"fmt"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"net/http"
 	"strings"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/kouzoh/merlin/notifiers/alert"
 	"github.com/kouzoh/merlin/notifiers/slack"
@@ -76,6 +77,7 @@ func (n NotifierStatus) ListAlerts() (list []string) {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
+// +kubebuilder:subresource:status
 
 // Notifier is the Schema for the notifiers API
 type Notifier struct {
@@ -91,6 +93,7 @@ func (n *Notifier) Notify(client *http.Client) {
 		if a.Suppressed {
 			continue
 		}
+
 		if a.Status != alert.StatusFiring { // wont send again if already firing
 			if n.Spec.Slack.Channel != "" {
 				err := n.Spec.Slack.SendAlert(client, a)
@@ -99,19 +102,20 @@ func (n *Notifier) Notify(client *http.Client) {
 					a.Status = alert.StatusError
 				} else {
 					a.Error = ""
-					if a.Status == alert.StatusPending {
+					if a.Status == alert.StatusPending || a.Status == "" {
 						a.Status = alert.StatusFiring
 					}
 				}
+
 			} else {
 				// TODO: add pagerduty, note if they'll co-exists then we'll need other Status/Error fields for PagerDuty
 			}
+		}
 
-			if a.Status == alert.StatusRecovering {
-				delete(n.Status.Alerts, name)
-			} else {
-				n.Status.Alerts[name] = a
-			}
+		if a.Status == alert.StatusRecovering {
+			delete(n.Status.Alerts, name)
+		} else {
+			n.Status.Alerts[name] = a
 		}
 	}
 	n.Status.CheckedAt = time.Now().Format(time.RFC3339)
@@ -132,23 +136,25 @@ func (n *Notifier) SetAlert(ruleKind, ruleName string, newAlert alert.Alert, isV
 	if isViolated {
 		if a, ok := n.Status.Alerts[name]; !ok {
 			newAlert.Status = alert.StatusPending
-			n.Status.Alerts[name] = newAlert
-		} else {
-			switch a.Status {
-			case alert.StatusFiring, alert.StatusPending, alert.StatusError:
-				// do nothing
-			case alert.StatusRecovering:
-				// recovering alert gets fired again, set them back to firing.
-				newAlert.Status = alert.StatusFiring
+		} else if a.Status == alert.StatusRecovering || a.Status == alert.StatusFiring {
+			newAlert.Status = alert.StatusFiring
+		}
+		n.Status.Alerts[name] = newAlert
+	} else {
+		if a, ok := n.Status.Alerts[name]; ok {
+			if a.Status == alert.StatusPending {
+				delete(n.Status.Alerts, name)
+			} else {
+				newAlert.Status = alert.StatusRecovering
 				n.Status.Alerts[name] = newAlert
 			}
 		}
-	} else {
-		if _, ok := n.Status.Alerts[name]; ok {
-			newAlert.Status = alert.StatusRecovering
-			n.Status.Alerts[name] = newAlert
-		}
 	}
+}
+
+type NotifiersCache struct {
+	Notifiers map[string]*Notifier
+	IsReady   bool
 }
 
 func init() {

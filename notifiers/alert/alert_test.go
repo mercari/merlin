@@ -1,17 +1,18 @@
 package alert
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAlert_ParseMessage(t *testing.T) {
 	a := Alert{
-		Severity:         SeverityInfo,
-		ViolationMessage: "test violation",
-		ResourceKind:     "hpa",
-		ResourceName:     "default/test-hpa",
-		Status:           StatusPending,
+		Severity:     SeverityInfo,
+		Message:      "test violation",
+		ResourceKind: "hpa",
+		ResourceName: "default/test-hpa",
+		Status:       StatusPending,
 	}
 
 	msg, err := a.ParseMessage()

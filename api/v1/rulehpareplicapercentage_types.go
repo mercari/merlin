@@ -18,10 +18,9 @@ package v1
 import (
 	"context"
 	"fmt"
+
 	"github.com/go-logr/logr"
-	"github.com/kouzoh/merlin/notifiers/alert"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,7 +45,16 @@ type RuleHPAReplicaPercentageList struct {
 	Items           []RuleHPAReplicaPercentage `json:"items"`
 }
 
+func (r RuleHPAReplicaPercentageList) ListItems() []Rule {
+	var items []Rule
+	for _, i := range r.Items {
+		items = append(items, &i)
+	}
+	return items
+}
+
 // +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 
 // RuleHPAReplicaPercentage is the Schema for the rulehpareplicapercentage API
 type RuleHPAReplicaPercentage struct {
@@ -57,85 +65,67 @@ type RuleHPAReplicaPercentage struct {
 	Status RuleStatus                   `json:"status,omitempty"`
 }
 
-func (r RuleHPAReplicaPercentage) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource types.NamespacedName, notifiers map[string]*Notifier) error {
-	// TODO: respect selector
-	l.Info("Evaluating", "name", r.Name, "rule", GetStructName(r))
-	var hpas autoscalingv1.HorizontalPodAutoscalerList
+func (r RuleHPAReplicaPercentage) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, object interface{}) (isViolated bool, message string, err error) {
+	hpa, ok := object.(autoscalingv1.HorizontalPodAutoscaler)
+	if !ok {
+		err = fmt.Errorf("unable to convert object to type %s", GetStructName(hpa))
+		return
+	}
+	l.Info("evaluating", GetStructName(hpa), hpa.Name)
 
-	// empty resource is from rule changed, check resources for new status
-	if resource == (types.NamespacedName{}) {
-		if err := cli.List(ctx, &hpas, &client.ListOptions{Namespace: r.Namespace}); err != nil {
-			if apierrs.IsNotFound(err) {
-				l.Info("No resources found for evaluation", "name", r.Name)
-				return nil
-			}
-			return err
-		}
+	if float64(hpa.Status.CurrentReplicas)/float64(hpa.Spec.MaxReplicas) >= float64(r.Spec.Percent)/100.0 {
+		isViolated = true
+		message = fmt.Sprintf("HPA percentage is >= %v%%", r.Spec.Percent)
 	} else {
-		hpa := autoscalingv1.HorizontalPodAutoscaler{}
-		err := cli.Get(ctx, resource, &hpa)
-		if apierrs.IsNotFound(err) {
-			// resource not found, wont add to the list, and removed it from alert
-			l.Info("resource not found - event is from deletion", "name", resource.String())
-			r.Status.SetViolation(resource, false)
-			newAlert := alert.Alert{
-				Suppressed:       r.Spec.Notification.Suppressed,
-				Severity:         r.Spec.Notification.Severity,
-				MessageTemplate:  r.Spec.Notification.CustomMessageTemplate,
-				ViolationMessage: "recovered since resource is deleted",
-				ResourceKind:     GetStructName(hpa),
-				ResourceName:     resource.String(),
-			}
-			for _, n := range r.Spec.Notification.Notifiers {
-				notifier, ok := notifiers[n]
-				if !ok {
-					l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
-					continue
-				}
-				notifier.SetAlert(r.Kind, r.Name, newAlert, false)
-			}
-		} else if err != nil {
-			return err
-		} else {
-			hpas.Items = append(hpas.Items, hpa)
-		}
+		message = fmt.Sprintf("HPA percentage is within threshold (< %v%%)", r.Spec.Percent)
 	}
-
-	for _, hpa := range hpas.Items {
-		namespacedName := types.NamespacedName{Namespace: hpa.Namespace, Name: hpa.Name}
-		isViolated := false
-		if float64(hpa.Status.CurrentReplicas)/float64(hpa.Spec.MaxReplicas) >= float64(r.Spec.Percent)/100.0 {
-			l.Info("resource has violation", "resource", namespacedName.String())
-			isViolated = true
-		}
-		r.Status.SetViolation(namespacedName, isViolated)
-		newAlert := alert.Alert{
-			Suppressed:       r.Spec.Notification.Suppressed,
-			Severity:         r.Spec.Notification.Severity,
-			MessageTemplate:  r.Spec.Notification.CustomMessageTemplate,
-			ViolationMessage: fmt.Sprintf("HPA percentage is > %v%%", r.Spec.Percent),
-			ResourceKind:     GetStructName(hpa),
-			ResourceName:     namespacedName.String(),
-		}
-		for _, n := range r.Spec.Notification.Notifiers {
-			notifier, ok := notifiers[n]
-			if !ok {
-				l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
-				continue
-			}
-			notifier.SetAlert(r.Kind, r.Name, newAlert, isViolated)
-		}
-	}
-
-	if err := cli.Update(ctx, &r); err != nil {
-		l.Error(err, "unable to update rule status", "rule", r.Name)
-		return err
-	}
-	return nil
+	return
 }
 
 func (r RuleHPAReplicaPercentage) GetStatus() RuleStatus {
 	return r.Status
+}
+
+func (r RuleHPAReplicaPercentage) List() RuleList {
+	return &RuleHPAReplicaPercentageList{}
+}
+
+func (r RuleHPAReplicaPercentage) IsNamespaceIgnored(namespace string) bool {
+	return false
+}
+
+func (r RuleHPAReplicaPercentage) GetNamespacedRuleList() RuleList {
+	return nil
+}
+
+func (r RuleHPAReplicaPercentage) GetNotification() Notification {
+	return r.Spec.Notification
+}
+
+func (r *RuleHPAReplicaPercentage) SetViolationStatus(name types.NamespacedName, isViolated bool) {
+	r.Status.SetViolation(name, isViolated)
+}
+
+func (r RuleHPAReplicaPercentage) GetResourceList() ResourceList {
+	return &autoscalingv1HPAList{}
+}
+
+func (r RuleHPAReplicaPercentage) IsNamespacedRule() bool {
+	return true
+}
+
+func (r RuleHPAReplicaPercentage) GetSelector() *Selector {
+	return &r.Spec.Selector
+}
+
+func (r RuleHPAReplicaPercentage) GetObjectNamespacedName(object interface{}) (namespacedName types.NamespacedName, err error) {
+	hpa, ok := object.(autoscalingv1.HorizontalPodAutoscaler)
+	if !ok {
+		err = fmt.Errorf("unable to convert object to type %T", hpa)
+		return
+	}
+	namespacedName = types.NamespacedName{Namespace: hpa.Namespace, Name: hpa.Name}
+	return
 }
 
 func init() {

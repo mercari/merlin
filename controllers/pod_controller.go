@@ -15,33 +15,10 @@ limitations under the License.
 
 package controllers
 
-import (
-	"context"
-
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
-	corev1 "k8s.io/api/core/v1"
-	ctrl "sigs.k8s.io/controller-runtime"
-)
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
 
 // PodReconciler reconciles a Pod object
 type PodReconciler struct {
-	Reconciler
-}
-
-// +kubebuilder:rbac:groups=merlin.mercari.com,resources=pods,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=merlin.mercari.com,resources=pods/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=corev1,resources=pods,verbs=get;list;watch
-
-func (r *PodReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
-	_ = r.Log.WithValues("pod", req.NamespacedName)
-
-	return ctrl.Result{}, nil
-}
-
-func (r *PodReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&merlinv1.RulePodResources{}).
-		For(&corev1.Pod{}).
-		Complete(r)
+	BaseReconciler
 }

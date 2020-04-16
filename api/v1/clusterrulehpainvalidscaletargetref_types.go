@@ -18,11 +18,10 @@ package v1
 import (
 	"context"
 	"fmt"
+
 	"github.com/go-logr/logr"
-	"github.com/kouzoh/merlin/notifiers/alert"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,8 +44,17 @@ type ClusterRuleHPAInvalidScaleTargetRefList struct {
 	Items           []ClusterRuleHPAInvalidScaleTargetRef `json:"items"`
 }
 
+func (c ClusterRuleHPAInvalidScaleTargetRefList) ListItems() []Rule {
+	var items []Rule
+	for _, i := range c.Items {
+		items = append(items, &i)
+	}
+	return items
+}
+
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
+// +kubebuilder:subresource:status
 
 // ClusterRuleHPAInvalidScaleTargetRef is the Schema for the cluster rule hpa invalid scale target refs API
 type ClusterRuleHPAInvalidScaleTargetRef struct {
@@ -57,90 +65,15 @@ type ClusterRuleHPAInvalidScaleTargetRef struct {
 	Status RuleStatus                              `json:"status,omitempty"`
 }
 
-func (r ClusterRuleHPAInvalidScaleTargetRef) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource types.NamespacedName, notifiers map[string]*Notifier) error {
-	l.Info("Evaluating", "name", r.Name, "rule", GetStructName(r))
-	var hpas autoscalingv1.HorizontalPodAutoscalerList
-
-	// resource == nil is from rule changed, check resources for new status
-	if resource == (types.NamespacedName{}) {
-		if err := cli.List(ctx, &hpas); err != nil {
-			if apierrs.IsNotFound(err) {
-				l.Info("No resources found for evaluation", "name", r.Name)
-				return nil
-			}
-			return err
-		}
-	} else {
-		hpa := autoscalingv1.HorizontalPodAutoscaler{}
-		err := cli.Get(ctx, resource, &hpa)
-		if apierrs.IsNotFound(err) {
-			// resource not found, wont add to the list, and removed it from alert
-			l.Info("resource not found - event is from deletion", "name", resource.String())
-			r.Status.SetViolation(resource, false)
-			newAlert := alert.Alert{
-				Suppressed:       r.Spec.Notification.Suppressed,
-				Severity:         r.Spec.Notification.Severity,
-				MessageTemplate:  r.Spec.Notification.CustomMessageTemplate,
-				ViolationMessage: "recovered since resource is deleted",
-				ResourceKind:     GetStructName(hpa),
-				ResourceName:     resource.String(),
-			}
-			for _, n := range r.Spec.Notification.Notifiers {
-				notifier, ok := notifiers[n]
-				if !ok {
-					l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
-					continue
-				}
-				notifier.SetAlert(r.Kind, r.Name, newAlert, false)
-			}
-		} else if err != nil {
-			return err
-		} else {
-			hpas.Items = append(hpas.Items, hpa)
-		}
+func (c ClusterRuleHPAInvalidScaleTargetRef) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, object interface{}) (isViolated bool, message string, err error) {
+	hpa, ok := object.(autoscalingv1.HorizontalPodAutoscaler)
+	if !ok {
+		err = fmt.Errorf("unable to convert object to type %T", hpa)
+		return
 	}
+	l.Info("evaluating", GetStructName(hpa), hpa.Name)
 
-	for _, hpa := range hpas.Items {
-		l.Info("Checking hpa", "hpa", hpa.Name)
-		namespacedName := types.NamespacedName{Namespace: hpa.Namespace, Name: hpa.Name}
-		hasMatch, err := r.HPAHasMatch(ctx, cli, l, hpa)
-		if err != nil {
-			return err
-		}
-
-		isViolated := false
-		if !hasMatch && !IsStringInSlice(r.Spec.IgnoreNamespaces, hpa.Namespace) {
-			l.Info("resource has violation", "resource", namespacedName.String())
-			isViolated = true
-		}
-		r.Status.SetViolation(namespacedName, isViolated)
-		newAlert := alert.Alert{
-			Suppressed:       r.Spec.Notification.Suppressed,
-			Severity:         r.Spec.Notification.Severity,
-			MessageTemplate:  r.Spec.Notification.CustomMessageTemplate,
-			ViolationMessage: "HPA has invalid scale target ref",
-			ResourceKind:     GetStructName(hpa),
-			ResourceName:     namespacedName.String(),
-		}
-		for _, n := range r.Spec.Notification.Notifiers {
-			notifier, ok := notifiers[n]
-			if !ok {
-				l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
-				continue
-			}
-			notifier.SetAlert(r.Kind, r.Name, newAlert, isViolated)
-		}
-	}
-
-	if err := cli.Update(ctx, &r); err != nil {
-		l.Error(err, "unable to update rule status", "rule", r.Name)
-		return err
-	}
-	return nil
-}
-
-func (r ClusterRuleHPAInvalidScaleTargetRef) HPAHasMatch(ctx context.Context, cli client.Client, l logr.Logger, hpa autoscalingv1.HorizontalPodAutoscaler) (hasMatch bool, err error) {
-	match := false
+	var hasMatch bool
 	switch hpa.Spec.ScaleTargetRef.Kind {
 	case "Deployment":
 		deployments := appsv1.DeploymentList{}
@@ -150,7 +83,7 @@ func (r ClusterRuleHPAInvalidScaleTargetRef) HPAHasMatch(ctx context.Context, cl
 		}
 		for _, d := range deployments.Items {
 			if d.Name == hpa.Spec.ScaleTargetRef.Name {
-				match = true
+				hasMatch = true
 				break
 			}
 		}
@@ -162,7 +95,7 @@ func (r ClusterRuleHPAInvalidScaleTargetRef) HPAHasMatch(ctx context.Context, cl
 		}
 		for _, d := range replicaSets.Items {
 			if d.Name == hpa.Spec.ScaleTargetRef.Name {
-				match = true
+				hasMatch = true
 				break
 			}
 		}
@@ -171,11 +104,60 @@ func (r ClusterRuleHPAInvalidScaleTargetRef) HPAHasMatch(ctx context.Context, cl
 		l.Error(err, "kind", hpa.Spec.ScaleTargetRef.Kind, "name", hpa.Spec.ScaleTargetRef.Name)
 		return
 	}
-	return match, nil
+
+	if hasMatch {
+		message = "HPA has valid scale target ref"
+	} else {
+		isViolated = true
+		message = "HPA has invalid scale target ref"
+	}
+	return
 }
 
-func (r ClusterRuleHPAInvalidScaleTargetRef) GetStatus() RuleStatus {
-	return r.Status
+func (c ClusterRuleHPAInvalidScaleTargetRef) GetStatus() RuleStatus {
+	return c.Status
+}
+
+func (c ClusterRuleHPAInvalidScaleTargetRef) List() RuleList {
+	return &ClusterRuleHPAInvalidScaleTargetRefList{}
+}
+
+func (c ClusterRuleHPAInvalidScaleTargetRef) IsNamespaceIgnored(namespace string) bool {
+	return IsStringInSlice(c.Spec.IgnoreNamespaces, namespace)
+}
+
+func (c ClusterRuleHPAInvalidScaleTargetRef) GetNamespacedRuleList() RuleList {
+	return nil
+}
+
+func (c ClusterRuleHPAInvalidScaleTargetRef) GetNotification() Notification {
+	return c.Spec.Notification
+}
+
+func (c *ClusterRuleHPAInvalidScaleTargetRef) SetViolationStatus(name types.NamespacedName, isViolated bool) {
+	c.Status.SetViolation(name, isViolated)
+}
+
+func (c ClusterRuleHPAInvalidScaleTargetRef) GetResourceList() ResourceList {
+	return &autoscalingv1HPAList{}
+}
+
+func (c ClusterRuleHPAInvalidScaleTargetRef) IsNamespacedRule() bool {
+	return false
+}
+
+func (c ClusterRuleHPAInvalidScaleTargetRef) GetSelector() *Selector {
+	return nil
+}
+
+func (c ClusterRuleHPAInvalidScaleTargetRef) GetObjectNamespacedName(object interface{}) (namespacedName types.NamespacedName, err error) {
+	hpa, ok := object.(autoscalingv1.HorizontalPodAutoscaler)
+	if !ok {
+		err = fmt.Errorf("unable to convert object to type %T", hpa)
+		return
+	}
+	namespacedName = types.NamespacedName{Namespace: hpa.Namespace, Name: hpa.Name}
+	return
 }
 
 func init() {

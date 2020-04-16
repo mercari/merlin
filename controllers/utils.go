@@ -8,9 +8,7 @@ import (
 )
 
 const (
-	AnnotationCheckedTime = merlinv1.GROUP + "/checked-at"
-	AnnotationIssue       = merlinv1.GROUP + "/issue"
-	indexField            = ".metadata.name"
+	metadataNameField = ".metadata.name"
 )
 
 func GetStructName(v interface{}) string {

@@ -19,14 +19,14 @@ endif
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[\/a-zA-Z_-]+:.*?## / {sub("\\\\n",sprintf("\n%22c"," "), $$2);printf "\033[36m%-25s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-test: generate fmt vet manifests ## Run tests
+test: generate imports vet manifests ## Run tests
 	go test ./... -coverprofile coverage.out
 
-manager: generate fmt vet ## Build manager binary
+manager: generate imports vet ## Build manager binary
 	go build -o bin/manager main.go
 
 
-run: generate fmt vet manifests ## Run against the configured Kubernetes cluster in ~/.kube/config
+run: generate imports vet manifests ## Run against the configured Kubernetes cluster in ~/.kube/config
 	go run ./main.go
 
 show-crd: manifests ## Show CRDs
@@ -53,8 +53,13 @@ deploy: manifests ## Deploy controller in the configured Kubernetes cluster in ~
 manifests: controller-gen ## Generate manifests e.g. CRD, RBAC etc.
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
-fmt: ## Run go fmt against code
-	go fmt ./...
+imports: ## Run go imports against code
+ifeq (, $(shell which goimports))
+	go get golang.org/x/tools/cmd/goimports
+endif
+	@for FILENAME in $$(find . -type f -name '*.go' -not -path "./vendor/*"); do \
+		goimports -w $$FILENAME; \
+	done
 
 vet: ## Run go vet against code
 	go vet ./...

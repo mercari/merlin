@@ -18,20 +18,16 @@ package v1
 import (
 	"context"
 	"fmt"
+
 	"github.com/go-logr/logr"
-	"github.com/kouzoh/merlin/notifiers/alert"
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // RulePDBMinAllowedDisruptionSpec defines the desired state of RulePDBMinAllowedDisruption
 type RulePDBMinAllowedDisruptionSpec struct {
@@ -52,7 +48,16 @@ type RulePDBMinAllowedDisruptionList struct {
 	Items           []RulePDBMinAllowedDisruption `json:"items"`
 }
 
+func (r RulePDBMinAllowedDisruptionList) ListItems() []Rule {
+	var items []Rule
+	for _, i := range r.Items {
+		items = append(items, &i)
+	}
+	return items
+}
+
 // +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 
 // RulePDBMinAllowedDisruption is the Schema for the rulepdbminalloweddisruptions API
 type RulePDBMinAllowedDisruption struct {
@@ -63,113 +68,92 @@ type RulePDBMinAllowedDisruption struct {
 	Status RuleStatus                      `json:"status,omitempty"`
 }
 
-func (r RulePDBMinAllowedDisruption) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, resource types.NamespacedName, notifiers map[string]*Notifier) error {
-	l.Info("Evaluating", "name", r.Name, "rule", GetStructName(r))
-	var pdbs policyv1beta1.PodDisruptionBudgetList
-
-	// empty resource is from rule changed, check resources for new status
-	if resource == (types.NamespacedName{}) {
-		if err := cli.List(ctx, &pdbs, &client.ListOptions{Namespace: r.Namespace}); err != nil {
-			if apierrs.IsNotFound(err) {
-				l.Info("No resources found for evaluation", "name", r.Name)
-				return nil
-			}
-			return err
-		}
-	} else {
-		pdb := policyv1beta1.PodDisruptionBudget{}
-		err := cli.Get(ctx, resource, &pdb)
-		if apierrs.IsNotFound(err) {
-			// resource not found, wont add to the list, and removed it from alert
-			l.Info("resource not found - event is from deletion", "name", resource.String())
-			r.Status.SetViolation(resource, false)
-			newAlert := alert.Alert{
-				Suppressed:       r.Spec.Notification.Suppressed,
-				Severity:         r.Spec.Notification.Severity,
-				MessageTemplate:  r.Spec.Notification.CustomMessageTemplate,
-				ViolationMessage: "recovered since resource is deleted",
-				ResourceKind:     GetStructName(pdb),
-				ResourceName:     resource.String(),
-			}
-			for _, n := range r.Spec.Notification.Notifiers {
-				notifier, ok := notifiers[n]
-				if !ok {
-					l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
-					continue
-				}
-				notifier.SetAlert(r.Kind, r.Name, newAlert, false)
-			}
-		} else if err != nil {
-			return err
-		} else {
-			pdbs.Items = append(pdbs.Items, pdb)
-		}
+func (r RulePDBMinAllowedDisruption) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, object interface{}) (isViolated bool, message string, err error) {
+	pdb, ok := object.(policyv1beta1.PodDisruptionBudget)
+	if !ok {
+		err = fmt.Errorf("unable to convert object to type %s", GetStructName(pdb))
+		return
 	}
+	l.Info("evaluating", GetStructName(pdb), pdb.Name)
 
-	minAllowedDisruption := 1
+	minAllowedDisruption := 1 // default value
 	if r.Spec.MinAllowedDisruption > minAllowedDisruption {
 		minAllowedDisruption = r.Spec.MinAllowedDisruption
 	}
 
-	for _, p := range pdbs.Items {
-		var err error
-		var allowedDisruption int
-		namespacedName := types.NamespacedName{Namespace: p.Namespace, Name: p.Name}
-		pods := corev1.PodList{}
-		if err := cli.List(ctx, &pods, &client.ListOptions{
-			Namespace:     p.Namespace,
-			LabelSelector: labels.SelectorFromSet(labels.Set(p.Spec.Selector.MatchLabels)),
-		}); err != nil && client.IgnoreNotFound(err) != nil {
-			return err
+	var allowedDisruption int
+	pods := corev1.PodList{}
+	if err = cli.List(ctx, &pods, &client.ListOptions{
+		Namespace:     pdb.Namespace,
+		LabelSelector: labels.SelectorFromSet(pdb.Spec.Selector.MatchLabels),
+	}); err != nil && client.IgnoreNotFound(err) != nil {
+		return
+	}
+	if pdb.Spec.MaxUnavailable != nil {
+		if allowedDisruption, err = intstr.GetValueFromIntOrPercent(pdb.Spec.MaxUnavailable, len(pods.Items), true); err != nil {
+			return
 		}
-		if p.Spec.MaxUnavailable != nil {
-			allowedDisruption, err = intstr.GetValueFromIntOrPercent(p.Spec.MaxUnavailable, int(len(pods.Items)), true)
-			if err != nil {
-				return err
-			}
-		} else if p.Spec.MinAvailable != nil {
-			var minAvailable int
-			minAvailable, err := intstr.GetValueFromIntOrPercent(p.Spec.MinAvailable, int(len(pods.Items)), true)
-			if err != nil {
-				return err
-			}
-			allowedDisruption = len(pods.Items) - minAvailable
+	} else if pdb.Spec.MinAvailable != nil {
+		var minAvailable int
+		if minAvailable, err = intstr.GetValueFromIntOrPercent(pdb.Spec.MinAvailable, len(pods.Items), true); err != nil {
+			return
 		}
-
-		isViolated := false
-		if allowedDisruption < minAllowedDisruption {
-			l.Info("resource has violation", "resource", namespacedName.String())
-			isViolated = true
-		}
-
-		r.Status.SetViolation(namespacedName, isViolated)
-		newAlert := alert.Alert{
-			Suppressed:       r.Spec.Notification.Suppressed,
-			Severity:         r.Spec.Notification.Severity,
-			MessageTemplate:  r.Spec.Notification.CustomMessageTemplate,
-			ViolationMessage: fmt.Sprintf("PDB doesnt have enough disruption pod (expect %v, but currently is %v)", r.Spec.MinAllowedDisruption, allowedDisruption),
-			ResourceKind:     GetStructName(p),
-			ResourceName:     namespacedName.String(),
-		}
-		for _, n := range r.Spec.Notification.Notifiers {
-			notifier, ok := notifiers[n]
-			if !ok {
-				l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
-				continue
-			}
-			notifier.SetAlert(r.Kind, r.Name, newAlert, isViolated)
-		}
+		allowedDisruption = len(pods.Items) - minAvailable
 	}
 
-	if err := cli.Update(ctx, &r); err != nil {
-		l.Error(err, "unable to update rule status", "rule", r.Name)
-		return err
+	if allowedDisruption < minAllowedDisruption {
+		isViolated = true
+		message = fmt.Sprintf("PDB doesnt have enough disruption pod (expect %v, but currently is %v)", minAllowedDisruption, allowedDisruption)
+	} else {
+		message = fmt.Sprintf("PDB has enough disruption pod (expect %v, currently is %v)", minAllowedDisruption, allowedDisruption)
 	}
-	return nil
+	return
 }
 
 func (r RulePDBMinAllowedDisruption) GetStatus() RuleStatus {
 	return r.Status
+}
+
+func (r RulePDBMinAllowedDisruption) List() RuleList {
+	return &RulePDBMinAllowedDisruptionList{}
+}
+
+func (r RulePDBMinAllowedDisruption) IsNamespaceIgnored(namespace string) bool {
+	return false
+}
+
+func (r RulePDBMinAllowedDisruption) GetNamespacedRuleList() RuleList {
+	return nil
+}
+
+func (r RulePDBMinAllowedDisruption) GetNotification() Notification {
+	return r.Spec.Notification
+}
+
+func (r *RulePDBMinAllowedDisruption) SetViolationStatus(name types.NamespacedName, isViolated bool) {
+	r.Status.SetViolation(name, isViolated)
+}
+
+func (r RulePDBMinAllowedDisruption) GetResourceList() ResourceList {
+	return &policyv1beta1PDBList{}
+}
+
+func (r RulePDBMinAllowedDisruption) IsNamespacedRule() bool {
+	return true
+}
+
+func (r RulePDBMinAllowedDisruption) GetSelector() *Selector {
+	return &r.Spec.Selector
+}
+
+func (r RulePDBMinAllowedDisruption) GetObjectNamespacedName(object interface{}) (namespacedName types.NamespacedName, err error) {
+	pdb, ok := object.(policyv1beta1.PodDisruptionBudget)
+	if !ok {
+		err = fmt.Errorf("unable to convert object to type %T", pdb)
+		return
+	}
+	namespacedName = types.NamespacedName{Namespace: pdb.Namespace, Name: pdb.Name}
+	return
 }
 
 func init() {

@@ -15,6 +15,8 @@ spec:
     plural: notifiers
     singular: notifier
   scope: Cluster
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
       description: Notifier is the Schema for the notifiers API
@@ -74,6 +76,9 @@ spec:
                     description: Error is the err from any issues for sending message
                       to external system
                     type: string
+                  message:
+                    description: Message is the message for the violation
+                    type: string
                   resourceKind:
                     description: ResourceKind is the resource's kind that has issue,
                       e.g., hpa, pdb, pod, service, etc.
@@ -93,17 +98,14 @@ spec:
                     description: Suppressed means if this notification has been suppressed,
                       can be used to temporary reduce the noise
                     type: boolean
-                  violationMessage:
-                    description: ViolationMessage is the message for the violation
-                    type: string
                 required:
                 - error
+                - message
                 - resourceKind
                 - resourceName
                 - severity
                 - status
                 - suppressed
-                - violationMessage
                 type: object
               description: Alerts are the map of alerts currently firing/pending for
                 objects violate the rule

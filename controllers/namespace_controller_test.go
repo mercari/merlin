@@ -2,6 +2,9 @@ package controllers
 
 import (
 	"context"
+	"strings"
+	"time"
+
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
 	"github.com/kouzoh/merlin/notifiers/alert"
 	. "github.com/onsi/ginkgo"
@@ -11,8 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"strings"
-	"time"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -53,7 +54,7 @@ var _ = Describe("NamespaceControllerTests", func() {
 			if !isNotifierCreated {
 				Expect(k8sClient.Create(ctx, notifier)).Should(Succeed())
 				Eventually(func() map[string]*merlinv1.Notifier {
-					return notifierReconciler.Notifiers
+					return notifierReconciler.NotifiersCache.Notifiers
 				}, time.Second*5, time.Millisecond*200).Should(HaveKey(notifier.Name))
 			}
 			isNotifierCreated = true
@@ -97,16 +98,14 @@ var _ = Describe("NamespaceControllerTests", func() {
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).Should(HaveKey(alertKey))
-			Expect(notifierReconciler.Notifiers[notifier.Name].Status.Alerts).Should(HaveKey(alertKey))
-		})
+			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).Should(HaveKey(alertKey))
 
-		It("TestApplyClusterRuleNamespaceRequiredLabelForIgnoredNamespace", func() {
+			By("Ignored Namespace should not have alert")
 			ignoredAlertKey := strings.Join([]string{ruleStructName, rule.Name, "", kubeSystemNamespace}, Separator)
 			n := &merlinv1.Notifier{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 			Expect(n.Status.Alerts).ShouldNot(HaveKey(ignoredAlertKey))
-			Expect(notifierReconciler.Notifiers[notifier.Name].Status.Alerts).ShouldNot(HaveKey(ignoredAlertKey))
+			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).ShouldNot(HaveKey(ignoredAlertKey))
 		})
 	})
-
 })
