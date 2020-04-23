@@ -128,6 +128,18 @@ func (r RuleHPAReplicaPercentage) GetObjectNamespacedName(object interface{}) (n
 	return
 }
 
+func (r RuleHPAReplicaPercentage) GetObjectMeta() metav1.ObjectMeta {
+	return r.ObjectMeta
+}
+
+func (r *RuleHPAReplicaPercentage) SetFinalizer(finalizer string) {
+	r.ObjectMeta.Finalizers = append(r.ObjectMeta.Finalizers, finalizer)
+}
+
+func (r *RuleHPAReplicaPercentage) RemoveFinalizer(finalizer string) {
+	removeString(r.ObjectMeta.Finalizers, finalizer)
+}
+
 func init() {
 	SchemeBuilder.Register(&RuleHPAReplicaPercentage{}, &RuleHPAReplicaPercentageList{})
 }

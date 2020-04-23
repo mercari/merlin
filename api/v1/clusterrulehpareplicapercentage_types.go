@@ -129,6 +129,18 @@ func (c ClusterRuleHPAReplicaPercentage) GetObjectNamespacedName(object interfac
 	return
 }
 
+func (c ClusterRuleHPAReplicaPercentage) GetObjectMeta() metav1.ObjectMeta {
+	return c.ObjectMeta
+}
+
+func (c *ClusterRuleHPAReplicaPercentage) SetFinalizer(finalizer string) {
+	c.ObjectMeta.Finalizers = append(c.ObjectMeta.Finalizers, finalizer)
+}
+
+func (c *ClusterRuleHPAReplicaPercentage) RemoveFinalizer(finalizer string) {
+	removeString(c.ObjectMeta.Finalizers, finalizer)
+}
+
 func init() {
 	SchemeBuilder.Register(&ClusterRuleHPAReplicaPercentage{}, &ClusterRuleHPAReplicaPercentageList{})
 }

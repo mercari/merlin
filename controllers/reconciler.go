@@ -34,20 +34,24 @@ type BaseReconciler struct {
 	WatchedAPIType runtime.Object
 }
 
-func (r *BaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+const FinalizerName = "rule.finalizers.merlin.mercari.com"
+
+func (b *BaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	l := r.Log.WithName("Reconcile")
+	l := b.Log.WithName("Reconcile")
 	var rulesToApply []merlinv1.Rule
 	var objectKey client.ObjectKey // the object key this reconciler watches, will be empty if the trigger is rules.
 
-	// Check what's been changed - since we watch for
+	// Check what's been changed - since we watch for both rules and kubernetes resources
 	resourceNames := strings.Split(req.Name, Separator)
 	if len(resourceNames) >= 2 {
 		//  it's clusterRule or rule changes
 		l = l.WithValues("rule", req.NamespacedName)
 		var rule runtime.Object
-		for _, r := range r.Rules {
+		var ruleKind string
+		for _, r := range b.Rules {
 			if resourceNames[0] == GetStructName(r) {
+				ruleKind = GetStructName(r)
 				rule = r.DeepCopyObject()
 				break
 			}
@@ -59,29 +63,58 @@ func (r *BaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			return ctrl.Result{}, err
 		}
 
-		if err := r.Client.Get(ctx, client.ObjectKey{Namespace: req.Namespace, Name: resourceNames[1]}, rule); err != nil {
+		if err := b.Client.Get(ctx, client.ObjectKey{Namespace: req.Namespace, Name: resourceNames[1]}, rule); err != nil {
 			if apierrs.IsNotFound(err) {
-				// TODO: objectKey is deleted, clean up notifications
+				l.Info("rule is deleted")
 				return ctrl.Result{}, nil
 			}
 			return ctrl.Result{RequeueAfter: requeueIntervalForError()}, err
 		}
-		rulesToApply = []merlinv1.Rule{rule.(merlinv1.Rule)}
+
+		r := rule.(merlinv1.Rule)
+		if r.GetObjectMeta().DeletionTimestamp.IsZero() {
+			if !containsString(r.GetObjectMeta().Finalizers, FinalizerName) {
+				l.V(1).Info("Setting finalizer", "finalizer", FinalizerName)
+				r.SetFinalizer(FinalizerName)
+				if err := b.Update(ctx, r); err != nil {
+					l.Error(err, "Failed to set finalizer")
+					return ctrl.Result{}, err
+				}
+			}
+		} else if containsString(r.GetObjectMeta().Finalizers, FinalizerName) {
+			l.Info("Rule is being delete, clear alerts")
+			for _, n := range r.GetNotification().Notifiers {
+				notifier, ok := b.Notifiers.Notifiers[n]
+				if !ok {
+					l.Error(merlinv1.NotifierNotFoundErr, "notifier not found", "notifier", n)
+					continue
+				}
+				l.V(1).Info("removing alert from notifier", "notifier", notifier.Name)
+				notifier.ClearRuleAlerts(ruleKind, r.GetName(), "recover alert since rule is being deleted")
+				r.RemoveFinalizer(FinalizerName)
+				if err := b.Update(ctx, r); err != nil {
+					l.Error(err, "Failed to remove finalizer")
+					return ctrl.Result{}, err
+				}
+				return ctrl.Result{}, nil
+			}
+		}
+		rulesToApply = []merlinv1.Rule{r}
 
 	} else {
 		// resource changes
-		object := r.WatchedAPIType.DeepCopyObject()
+		object := b.WatchedAPIType.DeepCopyObject()
 		objectKey = req.NamespacedName
-		l = l.WithValues(GetStructName(r.WatchedAPIType), objectKey)
-		if err := r.Client.Get(ctx, objectKey, object); client.IgnoreNotFound(err) != nil {
+		l = l.WithValues(GetStructName(b.WatchedAPIType), objectKey)
+		if err := b.Client.Get(ctx, objectKey, object); client.IgnoreNotFound(err) != nil {
 			return ctrl.Result{}, err
 		}
 
 		// get list of applicable rules
-		for _, rule := range r.Rules {
+		for _, rule := range b.Rules {
 			if rule.IsNamespacedRule() {
 				// skip namespaced rule since every namespace rule should be in pair with a cluster rule,
-				// and if a cluster rule has namespaced rule, its namespaced rule will be checked, so no need to check agagin.
+				// and if a cluster rule has namespaced rule, its namespaced rule will be checked, so no need to check again.
 				continue
 			}
 			ruleList := rule.List()
@@ -91,7 +124,7 @@ func (r *BaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			namespacedRuleList := rule.GetNamespacedRuleList()
 			if namespacedRuleList != nil {
 				l.V(1).Info("Rule has namespaced rule defined, getting namespaced rules", "namespacedRuleList", GetStructName(namespacedRuleList))
-				if err := r.List(ctx, namespacedRuleList, &client.ListOptions{Namespace: req.Namespace}); client.IgnoreNotFound(err) != nil {
+				if err := b.List(ctx, namespacedRuleList, &client.ListOptions{Namespace: req.Namespace}); client.IgnoreNotFound(err) != nil {
 					l.Error(err, "failed to list namespaced rules", "rule", GetStructName(rule))
 					return ctrl.Result{RequeueAfter: requeueIntervalForError()}, err
 				}
@@ -104,7 +137,7 @@ func (r *BaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			// not namespaced rule or no namespaced rules exists
 			if namespacedRuleList == nil || len(namespacedRuleList.ListItems()) <= 0 {
 				l.V(1).Info("Rule dosent have namespaced rule defined or none exists, getting cluster rules", "clusterRuleList", GetStructName(ruleList))
-				if err := r.List(ctx, ruleList); client.IgnoreNotFound(err) != nil {
+				if err := b.List(ctx, ruleList); client.IgnoreNotFound(err) != nil {
 					l.Error(err, "failed to list cluster rules", "rule", GetStructName(rule))
 					return ctrl.Result{RequeueAfter: requeueIntervalForError()}, err
 				}
@@ -125,10 +158,7 @@ func (r *BaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	l.V(1).Info("rules to apply", "rules", rulesToApply)
 	for _, rule := range rulesToApply {
-		if _, ok := r.RuleStatues[rule.GetName()]; !ok {
-			r.RuleStatues[rule.GetName()] = &RuleStatusWithLock{}
-		}
-		r.RuleStatues[rule.GetName()].Lock()
+		b.RuleStatues[rule.GetName()].Lock()
 
 		var isObjectDeleted bool
 		var listOptions = &client.ListOptions{}
@@ -141,13 +171,13 @@ func (r *BaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			if rule.IsNamespacedRule() {
 				listOptions = rule.GetSelector().AsListOption(req.NamespacedName.Namespace)
 			}
-			if err := r.Client.List(ctx, list, listOptions); err != nil {
+			if err := b.Client.List(ctx, list, listOptions); err != nil {
 				if apierrs.IsNotFound(err) {
 					l.Info("No objects found for evaluation")
-					r.RuleStatues[rule.GetName()].Unlock()
+					b.RuleStatues[rule.GetName()].Unlock()
 					return ctrl.Result{}, nil
 				}
-				r.RuleStatues[rule.GetName()].Unlock()
+				b.RuleStatues[rule.GetName()].Unlock()
 				return ctrl.Result{}, err
 			}
 		} else {
@@ -158,8 +188,8 @@ func (r *BaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 				listOptions.Namespace = objectKey.Namespace
 				listOptions.FieldSelector = fields.Set{metadataNameField: objectKey.Name}.AsSelector()
 			}
-			if err := r.Client.List(ctx, list, listOptions); client.IgnoreNotFound(err) != nil {
-				r.RuleStatues[rule.GetName()].Unlock()
+			if err := b.Client.List(ctx, list, listOptions); client.IgnoreNotFound(err) != nil {
+				b.RuleStatues[rule.GetName()].Unlock()
 				return ctrl.Result{RequeueAfter: requeueIntervalForError()}, err
 			}
 			if len(resourceList.ListItems()) == 0 {
@@ -182,16 +212,16 @@ func (r *BaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			if isObjectDeleted {
 				newAlert.Message = "recovered since object is deleted or ignored by rule selector"
 				newAlert.ResourceName = objectKey.String()
-				rule.SetViolationStatus(objectKey, isViolated)
+				rule.SetViolationStatus(objectKey, false)
 			} else {
 				namespacedName, err := rule.GetObjectNamespacedName(obj)
 				if err != nil {
-					r.RuleStatues[rule.GetName()].Unlock()
+					b.RuleStatues[rule.GetName()].Unlock()
 					return ctrl.Result{RequeueAfter: requeueIntervalForError()}, err
 				}
 
-				if isViolated, newAlert.Message, err = rule.Evaluate(ctx, r.Client, l, obj); err != nil {
-					r.RuleStatues[rule.GetName()].Unlock()
+				if isViolated, newAlert.Message, err = rule.Evaluate(ctx, b.Client, l, obj); err != nil {
+					b.RuleStatues[rule.GetName()].Unlock()
 					return ctrl.Result{RequeueAfter: requeueIntervalForError()}, err
 				}
 
@@ -210,7 +240,7 @@ func (r *BaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			}
 
 			for _, n := range rule.GetNotification().Notifiers {
-				notifier, ok := r.Notifiers.Notifiers[n]
+				notifier, ok := b.Notifiers.Notifiers[n]
 				if !ok {
 					l.Error(merlinv1.NotifierNotFoundErr, "notifier not found", "notifier", n)
 					continue
@@ -221,13 +251,13 @@ func (r *BaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		}
 
 		l.V(1).Info("updating rule status", "rule", rule.GetName(), "status", rule.GetStatus())
-		if err := r.Status().Update(ctx, rule); err != nil {
+		if err := b.Status().Update(ctx, rule); err != nil {
 			l.Error(err, "unable to update rule status", "rule", rule.GetName())
-			r.RuleStatues[rule.GetName()].Unlock()
+			b.RuleStatues[rule.GetName()].Unlock()
 			return ctrl.Result{RequeueAfter: requeueIntervalForError()}, err
 		}
-		r.RuleStatues[rule.GetName()].RuleStatus = rule.GetStatus()
-		r.RuleStatues[rule.GetName()].Unlock()
+		b.RuleStatues[rule.GetName()].RuleStatus = rule.GetStatus()
+		b.RuleStatues[rule.GetName()].Unlock()
 	}
 
 	return ctrl.Result{}, nil
@@ -240,19 +270,22 @@ func requeueIntervalForError() time.Duration {
 	return time.Duration(rand.Intn(max-min+1)+min) * time.Second
 }
 
-func (r *BaseReconciler) SetupWithManager(mgr ctrl.Manager, indexingFunc func(rawObj runtime.Object) []string) error {
-	l := r.Log.WithName("SetupWithManager")
-	r.RuleStatues = map[string]*RuleStatusWithLock{}
+func (b *BaseReconciler) SetupWithManager(mgr ctrl.Manager, indexingFunc func(rawObj runtime.Object) []string) error {
+	l := b.Log.WithName("SetupWithManager")
+	b.RuleStatues = map[string]*RuleStatusWithLock{}
 
-	if err := mgr.GetFieldIndexer().IndexField(r.WatchedAPIType, metadataNameField, indexingFunc); err != nil {
+	if err := mgr.GetFieldIndexer().IndexField(b.WatchedAPIType, metadataNameField, indexingFunc); err != nil {
 		return err
 	}
-	builder := ctrl.NewControllerManagedBy(mgr).For(r.WatchedAPIType)
+	builder := ctrl.NewControllerManagedBy(mgr).For(b.WatchedAPIType)
 
-	for _, rule := range r.Rules {
+	for _, rule := range b.Rules {
 		if err := mgr.GetFieldIndexer().IndexField(rule, metadataNameField, func(rawObj runtime.Object) []string {
 			obj := rawObj.(merlinv1.Rule)
 			l.Info("indexing", "rule", obj.GetName())
+			if _, ok := b.RuleStatues[obj.GetName()]; !ok {
+				b.RuleStatues[obj.GetName()] = &RuleStatusWithLock{}
+			}
 			return []string{obj.GetName()}
 		}); err != nil {
 			return err
@@ -260,8 +293,8 @@ func (r *BaseReconciler) SetupWithManager(mgr ctrl.Manager, indexingFunc func(ra
 		builder.Watches(&source.Kind{Type: rule}, &EventHandler{Log: l, Kind: GetStructName(rule)})
 	}
 
-	l.Info("initialize manager", "watch for resource", GetStructName(r.WatchedAPIType))
+	l.Info("initialize manager", "watch for resource", GetStructName(b.WatchedAPIType))
 	return builder.WithEventFilter(&EventFilter{Log: l}).
-		Named(GetStructName(r.WatchedAPIType)).
-		Complete(r)
+		Named(GetStructName(b.WatchedAPIType)).
+		Complete(b)
 }

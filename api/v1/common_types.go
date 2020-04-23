@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/kouzoh/merlin/notifiers/alert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -54,6 +55,12 @@ type Rule interface {
 	DeepCopyObject() runtime.Object
 	// GetObjectNamespacedName returns the object as types.NamespacedName
 	GetObjectNamespacedName(object interface{}) (types.NamespacedName, error)
+	// GetObjectMeta returns the objectMeta of the rule
+	GetObjectMeta() metav1.ObjectMeta
+	// SetFinalizer sets the finalizer in objectMeta
+	SetFinalizer(finalizer string)
+	// RemoveFinalizer removes the finalizer from objectMeta
+	RemoveFinalizer(finalizer string)
 }
 
 // +kubebuilder:object:generate=false

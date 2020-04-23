@@ -157,6 +157,18 @@ func (c ClusterRulePDBMinAllowedDisruption) GetObjectNamespacedName(object inter
 	return
 }
 
+func (c ClusterRulePDBMinAllowedDisruption) GetObjectMeta() metav1.ObjectMeta {
+	return c.ObjectMeta
+}
+
+func (c *ClusterRulePDBMinAllowedDisruption) SetFinalizer(finalizer string) {
+	c.ObjectMeta.Finalizers = append(c.ObjectMeta.Finalizers, finalizer)
+}
+
+func (c *ClusterRulePDBMinAllowedDisruption) RemoveFinalizer(finalizer string) {
+	removeString(c.ObjectMeta.Finalizers, finalizer)
+}
+
 func init() {
 	SchemeBuilder.Register(&ClusterRulePDBMinAllowedDisruption{}, &ClusterRulePDBMinAllowedDisruptionList{})
 }

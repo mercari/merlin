@@ -135,6 +135,18 @@ func (c ClusterRulePDBInvalidSelector) GetObjectNamespacedName(object interface{
 	return
 }
 
+func (c ClusterRulePDBInvalidSelector) GetObjectMeta() metav1.ObjectMeta {
+	return c.ObjectMeta
+}
+
+func (c *ClusterRulePDBInvalidSelector) SetFinalizer(finalizer string) {
+	c.ObjectMeta.Finalizers = append(c.ObjectMeta.Finalizers, finalizer)
+}
+
+func (c *ClusterRulePDBInvalidSelector) RemoveFinalizer(finalizer string) {
+	removeString(c.ObjectMeta.Finalizers, finalizer)
+}
+
 func init() {
 	SchemeBuilder.Register(&ClusterRulePDBInvalidSelector{}, &ClusterRulePDBInvalidSelectorList{})
 }

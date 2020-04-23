@@ -129,6 +129,18 @@ func (c ClusterRuleNamespaceRequiredLabel) GetObjectNamespacedName(object interf
 	return
 }
 
+func (c ClusterRuleNamespaceRequiredLabel) GetObjectMeta() metav1.ObjectMeta {
+	return c.ObjectMeta
+}
+
+func (c *ClusterRuleNamespaceRequiredLabel) SetFinalizer(finalizer string) {
+	c.ObjectMeta.Finalizers = append(c.ObjectMeta.Finalizers, finalizer)
+}
+
+func (c *ClusterRuleNamespaceRequiredLabel) RemoveFinalizer(finalizer string) {
+	removeString(c.ObjectMeta.Finalizers, finalizer)
+}
+
 func init() {
 	SchemeBuilder.Register(&ClusterRuleNamespaceRequiredLabel{}, &ClusterRuleNamespaceRequiredLabelList{})
 }

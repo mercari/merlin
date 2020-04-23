@@ -160,6 +160,18 @@ func (c ClusterRuleHPAInvalidScaleTargetRef) GetObjectNamespacedName(object inte
 	return
 }
 
+func (c ClusterRuleHPAInvalidScaleTargetRef) GetObjectMeta() metav1.ObjectMeta {
+	return c.ObjectMeta
+}
+
+func (c *ClusterRuleHPAInvalidScaleTargetRef) SetFinalizer(finalizer string) {
+	c.ObjectMeta.Finalizers = append(c.ObjectMeta.Finalizers, finalizer)
+}
+
+func (c *ClusterRuleHPAInvalidScaleTargetRef) RemoveFinalizer(finalizer string) {
+	removeString(c.ObjectMeta.Finalizers, finalizer)
+}
+
 func init() {
 	SchemeBuilder.Register(&ClusterRuleHPAInvalidScaleTargetRef{}, &ClusterRuleHPAInvalidScaleTargetRefList{})
 }

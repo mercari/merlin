@@ -1,6 +1,8 @@
 package v1
 
-import "reflect"
+import (
+	"reflect"
+)
 
 // IsStringInSlice checks if a string a slice
 func IsStringInSlice(slice []string, val string) bool {
@@ -18,4 +20,14 @@ func GetStructName(v interface{}) string {
 	} else {
 		return t.Name()
 	}
+}
+
+func removeString(slice []string, s string) (result []string) {
+	for _, item := range slice {
+		if item == s {
+			continue
+		}
+		result = append(result, item)
+	}
+	return
 }

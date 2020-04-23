@@ -152,6 +152,36 @@ func (n *Notifier) SetAlert(ruleKind, ruleName string, newAlert alert.Alert, isV
 	}
 }
 
+func (n *Notifier) ClearAllAlerts(message string) {
+	if n.Status.Alerts == nil {
+		n.Status.Alerts = map[string]alert.Alert{}
+	}
+	for k := range n.Status.Alerts {
+		newAlert := n.Status.Alerts[k]
+		newAlert.Status = alert.StatusRecovering
+		newAlert.Message = message + " " + n.Status.Alerts[k].Message
+		n.Status.Alerts[k] = newAlert
+	}
+	return
+}
+
+func (n *Notifier) ClearRuleAlerts(ruleKind, ruleName, message string) {
+	key := strings.Join([]string{ruleKind, ruleName}, Separator)
+	if n.Status.Alerts == nil {
+		n.Status.Alerts = map[string]alert.Alert{}
+	}
+	for k := range n.Status.Alerts {
+		alertRuleKey := strings.Join(strings.Split(k, Separator)[:2], Separator)
+		if alertRuleKey == key {
+			newAlert := n.Status.Alerts[k]
+			newAlert.Status = alert.StatusRecovering
+			newAlert.Message = message + " " + n.Status.Alerts[k].Message
+			n.Status.Alerts[k] = newAlert
+		}
+	}
+	return
+}
+
 type NotifiersCache struct {
 	Notifiers map[string]*Notifier
 	IsReady   bool

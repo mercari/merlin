@@ -54,7 +54,13 @@ func (r *NotifierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	notifier := merlinv1.Notifier{}
 	if err := r.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: req.Name}, &notifier); err != nil {
 		if apierrs.IsNotFound(err) {
-			// TODO: notifier is deleted, clean up notifications
+			_, ok := r.NotifiersCache.Notifiers[req.Name]
+			if ok {
+				l.Info("Clear alerts from since notifier is being deleted")
+				r.NotifiersCache.Notifiers[req.Name].ClearAllAlerts("recover alert since notifier is being deleted")
+				r.NotifiersCache.Notifiers[req.Name].Notify(r.HttpClient)
+				delete(r.NotifiersCache.Notifiers, req.Name)
+			}
 			return ctrl.Result{}, nil
 		}
 		l.Error(err, "failed to get notifier")

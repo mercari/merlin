@@ -3,7 +3,6 @@ package controllers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -71,7 +70,6 @@ var _ = Describe("NotifierControllerTests", func() {
 	})
 
 	It("TestApplyNotifier", func() {
-
 		Expect(k8sClient.Create(ctx, testNotifier)).Should(Succeed())
 		By("test notifier should be added into notifier reconciler's cache")
 		Eventually(func() bool {
@@ -135,11 +133,17 @@ var _ = Describe("NotifierControllerTests", func() {
 		Eventually(func() map[string]alert.Alert {
 			n := &merlinv1.Notifier{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: testNotifier.Name}, n)).Should(Succeed())
-			fmt.Println(n.Status)
 			return n.Status.Alerts
 		}, time.Second*3, time.Millisecond*200).ShouldNot(HaveKey(alertKey))
 
 		By("Notifier cache should remove the alert")
 		Expect(notifier.Status.Alerts).ShouldNot(HaveKey(alertKey))
+	})
+
+	It("TestRemoveNotifier", func() {
+		Expect(k8sClient.Delete(ctx, testNotifier)).Should(Succeed())
+		Eventually(func() map[string]*merlinv1.Notifier {
+			return notifierReconciler.NotifiersCache.Notifiers
+		}, time.Second*2, time.Millisecond*200).ShouldNot(HaveKey(testNotifier.Name))
 	})
 })

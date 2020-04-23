@@ -156,6 +156,18 @@ func (r RulePDBMinAllowedDisruption) GetObjectNamespacedName(object interface{})
 	return
 }
 
+func (r RulePDBMinAllowedDisruption) GetObjectMeta() metav1.ObjectMeta {
+	return r.ObjectMeta
+}
+
+func (r *RulePDBMinAllowedDisruption) SetFinalizer(finalizer string) {
+	r.ObjectMeta.Finalizers = append(r.ObjectMeta.Finalizers, finalizer)
+}
+
+func (r *RulePDBMinAllowedDisruption) RemoveFinalizer(finalizer string) {
+	removeString(r.ObjectMeta.Finalizers, finalizer)
+}
+
 func init() {
 	SchemeBuilder.Register(&RulePDBMinAllowedDisruption{}, &RulePDBMinAllowedDisruptionList{})
 }
