@@ -45,14 +45,6 @@ func TestSlack_SendAlert(t *testing.T) {
 								Text: "*[Alerting]* [warning] Kind `NS/Name` msg",
 							},
 						},
-						{
-							Type: BlockTypeSection,
-							Fields: []BlockSectionField{
-								{Type: TextTypeMarkdown, Text: "*Severity*"}, {Type: TextTypePlainText, Text: string(alert.SeverityWarning)},
-								{Type: TextTypeMarkdown, Text: "*Kind*"}, {Type: TextTypePlainText, Text: "Kind"},
-								{Type: TextTypeMarkdown, Text: "*Name*"}, {Type: TextTypePlainText, Text: "NS/Name"},
-							},
-						},
 					},
 				},
 			},
@@ -73,14 +65,6 @@ func TestSlack_SendAlert(t *testing.T) {
 							Text: &BlockSectionText{
 								Type: TextTypeMarkdown,
 								Text: "*[Alerting]* [info] Kind `NS/Name` msg",
-							},
-						},
-						{
-							Type: BlockTypeSection,
-							Fields: []BlockSectionField{
-								{Type: TextTypeMarkdown, Text: "*Severity*"}, {Type: TextTypePlainText, Text: "info"},
-								{Type: TextTypeMarkdown, Text: "*Kind*"}, {Type: TextTypePlainText, Text: "Kind"},
-								{Type: TextTypeMarkdown, Text: "*Name*"}, {Type: TextTypePlainText, Text: "NS/Name"},
 							},
 						},
 					},
@@ -104,14 +88,6 @@ func TestSlack_SendAlert(t *testing.T) {
 							Text: &BlockSectionText{
 								Type: TextTypeMarkdown,
 								Text: "*[Recovered]* [info] Kind `NS/Name` msg",
-							},
-						},
-						{
-							Type: BlockTypeSection,
-							Fields: []BlockSectionField{
-								{Type: TextTypeMarkdown, Text: "*Severity*"}, {Type: TextTypePlainText, Text: "info"},
-								{Type: TextTypeMarkdown, Text: "*Kind*"}, {Type: TextTypePlainText, Text: "Kind"},
-								{Type: TextTypeMarkdown, Text: "*Name*"}, {Type: TextTypePlainText, Text: "NS/Name"},
 							},
 						},
 					},

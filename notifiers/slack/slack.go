@@ -92,14 +92,6 @@ func (s *Slack) SendAlert(client *http.Client, a alert.Alert) error {
 							Text: messagePrefix + message,
 						},
 					},
-					{
-						Type: BlockTypeSection,
-						Fields: []BlockSectionField{
-							{Type: TextTypeMarkdown, Text: "*Severity*"}, {Type: TextTypePlainText, Text: string(a.Severity)},
-							{Type: TextTypeMarkdown, Text: "*Kind*"}, {Type: TextTypePlainText, Text: a.ResourceKind},
-							{Type: TextTypeMarkdown, Text: "*Name*"}, {Type: TextTypePlainText, Text: a.ResourceName},
-						},
-					},
 				},
 			},
 		},
