@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"reflect"
 	"sync"
 
@@ -10,6 +11,8 @@ import (
 const (
 	metadataNameField = ".metadata.name"
 )
+
+var NotifierNotFoundErr = fmt.Errorf("notifier not found")
 
 func GetStructName(v interface{}) string {
 	if t := reflect.TypeOf(v); t.Kind() == reflect.Ptr {

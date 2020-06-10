@@ -28,27 +28,28 @@ func (e *EventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInt
 		"new resource version", evt.MetaNew.GetResourceVersion(),
 	)
 
+	var req reconcile.Request
 	if evt.MetaOld != nil {
-		e.Log.Info("adding event to queue since old meta is not nil")
-		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
-			Name:      e.Kind + Separator + evt.MetaOld.GetName(),
+		req = reconcile.Request{NamespacedName: types.NamespacedName{
+			Name:      evt.MetaOld.GetName(),
 			Namespace: evt.MetaOld.GetNamespace(),
-		}})
-		return
-	} else {
-		e.Log.Error(nil, "UpdateEvent received with no old metadata", "event", evt)
-	}
+		}}
 
-	if evt.MetaNew != nil {
-		e.Log.Info("adding event to queue since new meta is not nil")
-		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
-			Name:      e.Kind + Separator + evt.MetaNew.GetName(),
+		e.Log.Info("adding event to queue since old meta is not nil")
+	} else if evt.MetaNew != nil {
+		req = reconcile.Request{NamespacedName: types.NamespacedName{
+			Name:      evt.MetaNew.GetName(),
 			Namespace: evt.MetaNew.GetNamespace(),
-		}})
-		return
+		}}
+		e.Log.Info("adding event to queue since new meta is not nil")
 	} else {
-		e.Log.Error(nil, "UpdateEvent received with no new metadata", "event", evt)
+		e.Log.Error(nil, "UpdateEvent received with no new or old metadata", "event", evt)
 	}
+	if e.Kind != "" {
+		req.Name = e.Kind + Separator + req.Name
+	}
+	q.Add(req)
+	return
 }
 
 // Create handles events from creating resources
@@ -58,10 +59,14 @@ func (e *EventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInt
 		e.Log.Error(nil, "CreateEvent received with no metadata", "event", evt)
 		return
 	}
-	q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
-		Name:      e.Kind + Separator + evt.Meta.GetName(),
+	req := reconcile.Request{NamespacedName: types.NamespacedName{
+		Name:      evt.Meta.GetName(),
 		Namespace: evt.Meta.GetNamespace(),
-	}})
+	}}
+	if e.Kind != "" {
+		req.Name = e.Kind + Separator + req.Name
+	}
+	q.Add(req)
 }
 
 // Delete handles events from deleting resources
@@ -71,10 +76,14 @@ func (e *EventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInt
 		e.Log.Error(nil, "DeleteEvent received with no metadata", "event", evt)
 		return
 	}
-	q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
-		Name:      e.Kind + Separator + evt.Meta.GetName(),
+	req := reconcile.Request{NamespacedName: types.NamespacedName{
+		Name:      evt.Meta.GetName(),
 		Namespace: evt.Meta.GetNamespace(),
-	}})
+	}}
+	if e.Kind != "" {
+		req.Name = e.Kind + Separator + req.Name
+	}
+	q.Add(req)
 }
 
 // Generic handles events from generic operations
@@ -84,8 +93,12 @@ func (e *EventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingI
 		e.Log.Error(nil, "GenericEvent received with no metadata", "event", evt)
 		return
 	}
-	q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
-		Name:      e.Kind + Separator + evt.Meta.GetName(),
+	req := reconcile.Request{NamespacedName: types.NamespacedName{
+		Name:      evt.Meta.GetName(),
 		Namespace: evt.Meta.GetNamespace(),
-	}})
+	}}
+	if e.Kind != "" {
+		req.Name = e.Kind + Separator + req.Name
+	}
+	q.Add(req)
 }

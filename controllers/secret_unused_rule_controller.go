@@ -15,10 +15,10 @@ limitations under the License.
 
 package controllers
 
-// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=merlin.mercari.com,resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=merlin.mercari.com,resources=secrets/status,verbs=get
 
-// PodReconciler reconciles a Pod object
-type PodReconciler struct {
-	ResourceReconciler
+// SecretUnusedReconciler reconciles rule of secret unused
+type SecretUnusedRuleReconciler struct {
+	RuleReconciler
 }

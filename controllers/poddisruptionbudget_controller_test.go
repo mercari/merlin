@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kouzoh/merlin/notifiers/alert"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -18,7 +17,10 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	// +kubebuilder:scaffold:imports
+
+	"github.com/kouzoh/merlin/alert"
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	"github.com/kouzoh/merlin/notifiers"
 )
 
 var _ = Describe("PDBControllerTests", func() {
@@ -60,8 +62,8 @@ var _ = Describe("PDBControllerTests", func() {
 			logf.Log.Info("Running test", "test", CurrentGinkgoTestDescription().FullTestText)
 			if !isNotifierCreated {
 				Expect(k8sClient.Create(ctx, notifier)).Should(Succeed())
-				Eventually(func() map[string]*merlinv1.Notifier {
-					return notifierReconciler.NotifiersCache.Notifiers
+				Eventually(func() map[string]*notifiers.Notifier {
+					return notifierReconciler.Cache.Notifiers
 				}, time.Second*5, time.Millisecond*200).Should(HaveKey(notifier.Name))
 			}
 			isNotifierCreated = true
@@ -96,7 +98,7 @@ var _ = Describe("PDBControllerTests", func() {
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).Should(HaveKey(alertKey))
 			// alert should be added to notifier status
-			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).Should(HaveKey(alertKey))
+			Expect(notifierReconciler.Cache.Notifiers[notifier.Name].Resource.Status.Alerts).Should(HaveKey(alertKey))
 		})
 
 		It("TestRemoveRuleShouldRemoveViolation", func() {
@@ -107,7 +109,7 @@ var _ = Describe("PDBControllerTests", func() {
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).ShouldNot(HaveKey(alertKey))
-			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).ShouldNot(HaveKey(alertKey))
+			Expect(notifierReconciler.Cache.Notifiers[notifier.Name].Resource.Status.Alerts).ShouldNot(HaveKey(alertKey))
 
 		})
 
@@ -123,7 +125,7 @@ var _ = Describe("PDBControllerTests", func() {
 				return r.Status.Violations
 			}, time.Second*3, time.Millisecond*200).Should(HaveKey(pdbNamespacedName.String()))
 			// alert should be added to notifier status
-			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).Should(HaveKey(alertKey))
+			Expect(notifierReconciler.Cache.Notifiers[notifier.Name].Resource.Status.Alerts).Should(HaveKey(alertKey))
 			Eventually(func() map[string]alert.Alert {
 				n := &merlinv1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
@@ -169,8 +171,8 @@ var _ = Describe("PDBControllerTests", func() {
 			logf.Log.Info("Running test", "test", CurrentGinkgoTestDescription().FullTestText)
 			if !isNotifierCreated {
 				Expect(k8sClient.Create(ctx, notifier)).Should(Succeed())
-				Eventually(func() map[string]*merlinv1.Notifier {
-					return notifierReconciler.NotifiersCache.Notifiers
+				Eventually(func() map[string]*notifiers.Notifier {
+					return notifierReconciler.Cache.Notifiers
 				}, time.Second*5, time.Millisecond*200).Should(HaveKey(notifier.Name))
 			}
 			isNotifierCreated = true
@@ -205,7 +207,7 @@ var _ = Describe("PDBControllerTests", func() {
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).Should(HaveKey(alertKey))
 			// alert should be added to notifier status
-			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).Should(HaveKey(alertKey))
+			Expect(notifierReconciler.Cache.Notifiers[notifier.Name].Resource.Status.Alerts).Should(HaveKey(alertKey))
 		})
 
 		It("TestRemoveRuleShouldRemoveViolation", func() {
@@ -216,7 +218,7 @@ var _ = Describe("PDBControllerTests", func() {
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).ShouldNot(HaveKey(alertKey))
-			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).ShouldNot(HaveKey(alertKey))
+			Expect(notifierReconciler.Cache.Notifiers[notifier.Name].Resource.Status.Alerts).ShouldNot(HaveKey(alertKey))
 
 		})
 
@@ -232,7 +234,7 @@ var _ = Describe("PDBControllerTests", func() {
 				return r.Status.Violations
 			}, time.Second*3, time.Millisecond*200).Should(HaveKey(pdbNamespacedName.String()))
 			// alert should be added to notifier status
-			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).Should(HaveKey(alertKey))
+			Expect(notifierReconciler.Cache.Notifiers[notifier.Name].Resource.Status.Alerts).Should(HaveKey(alertKey))
 			Eventually(func() map[string]alert.Alert {
 				n := &merlinv1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
@@ -272,7 +274,7 @@ var _ = Describe("PDBControllerTests", func() {
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).ShouldNot(HaveKey(alertKey))
 			// alert should be added to notifier status
-			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).ShouldNot(HaveKey(alertKey))
+			Expect(notifierReconciler.Cache.Notifiers[notifier.Name].Resource.Status.Alerts).ShouldNot(HaveKey(alertKey))
 		})
 	})
 
@@ -316,15 +318,18 @@ var _ = Describe("PDBControllerTests", func() {
 			logf.Log.Info("Running test", "test", CurrentGinkgoTestDescription().FullTestText)
 			if !isNotifierCreated {
 				Expect(k8sClient.Create(ctx, notifier)).Should(Succeed())
-				Eventually(func() map[string]*merlinv1.Notifier {
-					return notifierReconciler.NotifiersCache.Notifiers
+				Eventually(func() map[string]*notifiers.Notifier {
+					return notifierReconciler.Cache.Notifiers
 				}, time.Second*5, time.Millisecond*200).Should(HaveKey(notifier.Name))
 			}
 			isNotifierCreated = true
 
 			if !isNamespaceCreated {
 				Expect(k8sClient.Create(ctx, &corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{Namespace: namespace}}))
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      namespace,
+						Namespace: namespace,
+					}})).Should(Succeed())
 			}
 			isNamespaceCreated = true
 		})
@@ -358,7 +363,7 @@ var _ = Describe("PDBControllerTests", func() {
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).Should(HaveKey(alertKey))
 			// alert should be added to notifier status
-			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).Should(HaveKey(alertKey))
+			Expect(notifierReconciler.Cache.Notifiers[notifier.Name].Resource.Status.Alerts).Should(HaveKey(alertKey))
 		})
 
 		It("TestRemoveRuleShouldRemoveViolation", func() {
@@ -369,7 +374,7 @@ var _ = Describe("PDBControllerTests", func() {
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).ShouldNot(HaveKey(alertKey))
-			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).ShouldNot(HaveKey(alertKey))
+			Expect(notifierReconciler.Cache.Notifiers[notifier.Name].Resource.Status.Alerts).ShouldNot(HaveKey(alertKey))
 
 		})
 
@@ -385,7 +390,7 @@ var _ = Describe("PDBControllerTests", func() {
 				return r.Status.Violations
 			}, time.Second*3, time.Millisecond*200).Should(HaveKey(pdbNamespacedName.String()))
 			// alert should be added to notifier status
-			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).Should(HaveKey(alertKey))
+			Expect(notifierReconciler.Cache.Notifiers[notifier.Name].Resource.Status.Alerts).Should(HaveKey(alertKey))
 			Eventually(func() map[string]alert.Alert {
 				n := &merlinv1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
@@ -425,7 +430,7 @@ var _ = Describe("PDBControllerTests", func() {
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).ShouldNot(HaveKey(alertKey))
 			// alert should be added to notifier status
-			Expect(notifierReconciler.NotifiersCache.Notifiers[notifier.Name].Status.Alerts).ShouldNot(HaveKey(alertKey))
+			Expect(notifierReconciler.Cache.Notifiers[notifier.Name].Resource.Status.Alerts).ShouldNot(HaveKey(alertKey))
 		})
 	})
 

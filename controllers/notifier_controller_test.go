@@ -8,8 +8,6 @@ import (
 	"net/http/httptest"
 	"time"
 
-	"github.com/kouzoh/merlin/notifiers/alert"
-	"github.com/kouzoh/merlin/notifiers/slack"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -18,14 +16,16 @@ import (
 
 	// +kubebuilder:scaffold:imports
 
+	"github.com/kouzoh/merlin/alert"
+	"github.com/kouzoh/merlin/alert/slack"
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	"github.com/kouzoh/merlin/notifiers"
 )
 
 var _ = Describe("NotifierControllerTests", func() {
 	var ctx = context.Background()
 	const (
-		ruleKind = "testRuleKind"
-		ruleName = "testRuleName"
+		ruleName = "testRuleKind" + Separator + "testRuleName"
 	)
 
 	var testAlert = alert.Alert{
@@ -33,8 +33,9 @@ var _ = Describe("NotifierControllerTests", func() {
 		Message:      "test alert message",
 		ResourceKind: "hpa",
 		ResourceName: "default/test-resource-for-notifiers",
+		Violated:     true,
 	}
-	var alertKey = ruleKind + Separator + ruleName + Separator + testAlert.ResourceName
+	var alertKey = ruleName + Separator + testAlert.ResourceName
 	var m = http.NewServeMux()
 	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		req := &slack.Request{}
@@ -51,7 +52,7 @@ var _ = Describe("NotifierControllerTests", func() {
 		ObjectMeta: metav1.ObjectMeta{Name: "test-notifier"},
 		Spec: merlinv1.NotifierSpec{
 			NotifyInterval: 1,
-			Slack: slack.Slack{
+			Slack: slack.Spec{
 				WebhookURL: ts.URL,
 				Channel:    "test",
 			},
@@ -73,23 +74,25 @@ var _ = Describe("NotifierControllerTests", func() {
 		Expect(k8sClient.Create(ctx, testNotifier)).Should(Succeed())
 		By("test notifier should be added into notifier reconciler's cache")
 		Eventually(func() bool {
-			_, ok := notifierReconciler.NotifiersCache.Notifiers[testNotifier.Name]
+			_, ok := notifierReconciler.Cache.Notifiers[testNotifier.Name]
 			return ok
 		}, time.Second*2, time.Millisecond*200).Should(Equal(true))
 	})
 
 	It("TestAddAlertToNotifier", func() {
-		notifier := notifierReconciler.NotifiersCache.Notifiers[testNotifier.Name]
-		notifier.SetAlert(ruleKind, ruleName, testAlert, true)
+		notifier := notifierReconciler.Cache.Notifiers[testNotifier.Name]
+		notifier.SetAlert(ruleName, testAlert)
 		By("Notifier cache should have the status")
-		a, ok := notifier.Status.Alerts[alertKey]
+		a, ok := notifier.Resource.Status.Alerts[alertKey]
 		Expect(ok).To(Equal(true))
 		Expect(a).To(Equal(alert.Alert{
 			Severity:     testAlert.Severity,
 			ResourceKind: testAlert.ResourceKind,
 			ResourceName: testAlert.ResourceName,
 			Message:      testAlert.Message,
-			Status:       alert.StatusPending}))
+			Status:       alert.StatusPending,
+			Violated:     true,
+		}))
 
 		By("Notifier status should be updated to k8s")
 		Eventually(func() alert.Alert {
@@ -101,31 +104,38 @@ var _ = Describe("NotifierControllerTests", func() {
 			ResourceKind: testAlert.ResourceKind,
 			ResourceName: testAlert.ResourceName,
 			Message:      testAlert.Message,
-			Status:       alert.StatusFiring}))
+			Status:       alert.StatusFiring,
+			Violated:     true,
+		}))
 
 		By("Notifier cache should update the status")
-		a, ok = notifier.Status.Alerts[alertKey]
+		a, ok = notifier.Resource.Status.Alerts[alertKey]
 		Expect(ok).To(Equal(true))
 		Expect(a).To(Equal(alert.Alert{
 			Severity:     testAlert.Severity,
 			ResourceKind: testAlert.ResourceKind,
 			ResourceName: testAlert.ResourceName,
 			Message:      testAlert.Message,
-			Status:       alert.StatusFiring}))
+			Status:       alert.StatusFiring,
+			Violated:     true,
+		}))
 
 	})
 
 	It("TestRemoveAlertFromNotifier", func() {
-		notifier := notifierReconciler.NotifiersCache.Notifiers[testNotifier.Name]
-		notifier.SetAlert(ruleKind, ruleName, testAlert, false)
+		notifier := notifierReconciler.Cache.Notifiers[testNotifier.Name]
+		testAlert.Violated = false
+		notifier.SetAlert(ruleName, testAlert)
 		expectAlert := alert.Alert{
 			Severity:     testAlert.Severity,
 			ResourceKind: testAlert.ResourceKind,
 			ResourceName: testAlert.ResourceName,
 			Message:      testAlert.Message,
-			Status:       alert.StatusRecovering}
+			Status:       alert.StatusRecovering,
+			Violated:     false,
+		}
 		By("Notifier cache should have new status")
-		a, ok := notifier.Status.Alerts[alertKey]
+		a, ok := notifier.Resource.Status.Alerts[alertKey]
 		Expect(ok).To(Equal(true))
 		Expect(a).To(Equal(expectAlert))
 
@@ -137,13 +147,13 @@ var _ = Describe("NotifierControllerTests", func() {
 		}, time.Second*3, time.Millisecond*200).ShouldNot(HaveKey(alertKey))
 
 		By("Notifier cache should remove the alert")
-		Expect(notifier.Status.Alerts).ShouldNot(HaveKey(alertKey))
+		Expect(notifier.Resource.Status.Alerts).ShouldNot(HaveKey(alertKey))
 	})
 
 	It("TestRemoveNotifier", func() {
 		Expect(k8sClient.Delete(ctx, testNotifier)).Should(Succeed())
-		Eventually(func() map[string]*merlinv1.Notifier {
-			return notifierReconciler.NotifiersCache.Notifiers
+		Eventually(func() map[string]*notifiers.Notifier {
+			return notifierReconciler.Cache.Notifiers
 		}, time.Second*2, time.Millisecond*200).ShouldNot(HaveKey(testNotifier.Name))
 	})
 })

@@ -9,13 +9,15 @@ import (
 
 	"github.com/go-logr/logr"
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
-	"github.com/kouzoh/merlin/notifiers/alert"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	"github.com/kouzoh/merlin/alert"
+	"github.com/kouzoh/merlin/notifiers"
 )
 
 type BaseReconciler struct {
@@ -24,7 +26,7 @@ type BaseReconciler struct {
 	Scheme *runtime.Scheme
 	// Notifiers stores the notifiers as cache, this will be updated when any notifier updates happen,
 	// and also servers as cache so we dont need to get list of notifiers every time
-	Notifiers *merlinv1.NotifiersCache
+	Notifiers *notifiers.Cache
 	// RuleStatues stores the status of rules, it has sync.Mutex so reconciler process needs to acquire the lock
 	// before making changes
 	RuleStatues map[string]*RuleStatusWithLock
@@ -89,8 +91,8 @@ func (b *BaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 					l.Error(merlinv1.NotifierNotFoundErr, "notifier not found", "notifier", n)
 					continue
 				}
-				l.V(1).Info("removing alert from notifier", "notifier", notifier.Name)
-				notifier.ClearRuleAlerts(ruleKind, r.GetName(), "recover alert since rule is being deleted")
+				l.V(1).Info("removing alert from notifier", "notifier", notifier.Resource.Name)
+				notifier.ClearRuleAlerts(ruleKind+Separator+r.GetName(), "recover alert since rule is being deleted")
 				r.RemoveFinalizer(FinalizerName)
 				if err := b.Update(ctx, r); err != nil {
 					l.Error(err, "Failed to remove finalizer")
@@ -206,6 +208,7 @@ func (b *BaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 				Severity:        rule.GetNotification().Severity,
 				MessageTemplate: rule.GetNotification().CustomMessageTemplate,
 				ResourceKind:    GetStructName(obj),
+				Violated:        false,
 			}
 
 			isViolated := false
@@ -245,8 +248,9 @@ func (b *BaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 					l.Error(merlinv1.NotifierNotFoundErr, "notifier not found", "notifier", n)
 					continue
 				}
-				l.V(1).Info("setting alert to notifier", "notifier", notifier.Name, "object", newAlert.ResourceName, "isViolated", isViolated)
-				notifier.SetAlert(GetStructName(rule), rule.GetName(), newAlert, isViolated)
+				l.V(1).Info("setting alert to notifier", "notifier", notifier.Resource.Name, "object", newAlert.ResourceName, "isViolated", isViolated)
+				newAlert.Violated = isViolated
+				notifier.SetAlert(GetStructName(rule)+Separator+rule.GetName(), newAlert)
 			}
 		}
 
@@ -271,16 +275,17 @@ func requeueIntervalForError() time.Duration {
 }
 
 func (b *BaseReconciler) SetupWithManager(mgr ctrl.Manager, indexingFunc func(rawObj runtime.Object) []string) error {
+	ctx := context.Background()
 	l := b.Log.WithName("SetupWithManager")
 	b.RuleStatues = map[string]*RuleStatusWithLock{}
 
-	if err := mgr.GetFieldIndexer().IndexField(b.WatchedAPIType, metadataNameField, indexingFunc); err != nil {
+	if err := mgr.GetFieldIndexer().IndexField(ctx, b.WatchedAPIType, metadataNameField, indexingFunc); err != nil {
 		return err
 	}
 	builder := ctrl.NewControllerManagedBy(mgr).For(b.WatchedAPIType)
 
 	for _, rule := range b.Rules {
-		if err := mgr.GetFieldIndexer().IndexField(rule, metadataNameField, func(rawObj runtime.Object) []string {
+		if err := mgr.GetFieldIndexer().IndexField(ctx, rule, metadataNameField, func(rawObj runtime.Object) []string {
 			obj := rawObj.(merlinv1.Rule)
 			l.Info("indexing", "rule", obj.GetName())
 			if _, ok := b.RuleStatues[obj.GetName()]; !ok {

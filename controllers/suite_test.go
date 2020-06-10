@@ -28,6 +28,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	// +kubebuilder:scaffold:imports
@@ -45,7 +46,7 @@ func TestAPIs(t *testing.T) {
 
 	RunSpecsWithDefaultAndCustomReporters(t,
 		"Controller Suite",
-		[]Reporter{envtest.NewlineReporter{}})
+		[]Reporter{printer.NewlineReporter{}})
 }
 
 var _ = BeforeSuite(func(done Done) {
@@ -64,15 +65,14 @@ var _ = BeforeSuite(func(done Done) {
 	err = merlinv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	// +kubebuilder:scaffold:scheme
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:             scheme.Scheme,
-		MetricsBindAddress: "127.0.0.1:8080",
+		MetricsBindAddress: "127.0.0.1:9100",
 		LeaderElection:     false,
 		Port:               9443,
 	})
-	Expect(err).NotTo(HaveOccurred())
 
+	Expect(err).NotTo(HaveOccurred())
 	Expect(SetupReconcilers(mgr)).Should(Succeed())
 
 	go func() {

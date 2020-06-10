@@ -71,7 +71,7 @@ type RulePDBMinAllowedDisruption struct {
 func (r RulePDBMinAllowedDisruption) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, object interface{}) (isViolated bool, message string, err error) {
 	pdb, ok := object.(policyv1beta1.PodDisruptionBudget)
 	if !ok {
-		err = fmt.Errorf("unable to convert object to type %s", GetStructName(pdb))
+		err = fmt.Errorf("unable to convert object to type %T", pdb)
 		return
 	}
 	l.Info("evaluating", GetStructName(pdb), pdb.Name)

@@ -12,29 +12,49 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	"github.com/kouzoh/merlin/rules"
 )
-
-type IndexingFunc func(rawObj runtime.Object) []string
 
 var notifierReconciler *NotifierReconciler
 
 func SetupReconcilers(mgr manager.Manager) error {
 	notifierReconciler = &NotifierReconciler{
 		Client:     mgr.GetClient(),
-		Log:        ctrl.Log.WithName("ctrl").WithName("Notifier"),
+		Log:        ctrl.Log.WithName("Notifier"),
 		Scheme:     mgr.GetScheme(),
 		HttpClient: &http.Client{Timeout: 10 * time.Second},
 	}
 	if err := notifierReconciler.SetupWithManager(mgr); err != nil {
 		return err
 	}
+	secretUnusedRule := rules.NewSecretUnusedRule(mgr.GetClient(), ctrl.Log)
+
+	if err := (&SecretUnusedRuleReconciler{
+		RuleReconciler{
+			Client:        mgr.GetClient(),
+			Log:           ctrl.Log.WithName("SecretUnusedRule"),
+			Scheme:        mgr.GetScheme(),
+			NotifierCache: notifierReconciler.Cache,
+			Rule:          secretUnusedRule,
+		},
+	}).SetupWithManager(mgr,
+		&merlinv1.ClusterRuleSecretUnused{},
+		nil,
+		func(rawObj runtime.Object) []string {
+			obj := rawObj.(*merlinv1.ClusterRuleSecretUnused)
+			return []string{obj.ObjectMeta.Name}
+		}); err != nil {
+		return err
+	}
+
 	if err := (&PodReconciler{
-		BaseReconciler{
-			Client:         mgr.GetClient(),
-			Log:            ctrl.Log.WithName("ctrl").WithName("Pod"),
-			Scheme:         mgr.GetScheme(),
-			Notifiers:      notifierReconciler.NotifiersCache,
-			WatchedAPIType: &corev1.Pod{},
+		ResourceReconciler{
+			Client:        mgr.GetClient(),
+			Log:           ctrl.Log.WithName("Pod"),
+			Scheme:        mgr.GetScheme(),
+			NotifierCache: notifierReconciler.Cache,
+			Rules:         []rules.Rule{secretUnusedRule},
+			Resource:      &corev1.Pod{},
 		},
 	}).SetupWithManager(mgr, func(rawObj runtime.Object) []string {
 		obj := rawObj.(*corev1.Pod)
@@ -42,12 +62,13 @@ func SetupReconcilers(mgr manager.Manager) error {
 	}); err != nil {
 		return err
 	}
+
 	if err := (&HorizontalPodAutoscalerReconciler{
 		BaseReconciler{
 			Client:    mgr.GetClient(),
-			Log:       ctrl.Log.WithName("ctrl").WithName("HPA"),
+			Log:       ctrl.Log.WithName("HPA"),
 			Scheme:    mgr.GetScheme(),
-			Notifiers: notifierReconciler.NotifiersCache,
+			Notifiers: notifierReconciler.Cache,
 			Rules: []merlinv1.Rule{
 				&merlinv1.ClusterRuleHPAInvalidScaleTargetRef{},
 				&merlinv1.ClusterRuleHPAReplicaPercentage{},
@@ -61,12 +82,13 @@ func SetupReconcilers(mgr manager.Manager) error {
 	}); err != nil {
 		return err
 	}
+
 	if err := (&NamespaceReconciler{
 		BaseReconciler{
 			Client:    mgr.GetClient(),
-			Log:       ctrl.Log.WithName("ctrl").WithName("Namespace"),
+			Log:       ctrl.Log.WithName("Namespace"),
 			Scheme:    mgr.GetScheme(),
-			Notifiers: notifierReconciler.NotifiersCache,
+			Notifiers: notifierReconciler.Cache,
 			Rules: []merlinv1.Rule{
 				&merlinv1.ClusterRuleNamespaceRequiredLabel{},
 			},
@@ -78,12 +100,13 @@ func SetupReconcilers(mgr manager.Manager) error {
 	}); err != nil {
 		return err
 	}
+
 	if err := (&PodDisruptionBudgetReconciler{
 		BaseReconciler{
 			Client:    mgr.GetClient(),
-			Log:       ctrl.Log.WithName("ctrl").WithName("PDB"),
+			Log:       ctrl.Log.WithName("PDB"),
 			Scheme:    mgr.GetScheme(),
-			Notifiers: notifierReconciler.NotifiersCache,
+			Notifiers: notifierReconciler.Cache,
 			Rules: []merlinv1.Rule{
 				&merlinv1.ClusterRulePDBInvalidSelector{},
 				&merlinv1.ClusterRulePDBMinAllowedDisruption{},
@@ -101,9 +124,9 @@ func SetupReconcilers(mgr manager.Manager) error {
 	if err := (&ServiceReconciler{
 		BaseReconciler{
 			Client:    mgr.GetClient(),
-			Log:       ctrl.Log.WithName("ctrl").WithName("Service"),
+			Log:       ctrl.Log.WithName("Service"),
 			Scheme:    mgr.GetScheme(),
-			Notifiers: notifierReconciler.NotifiersCache,
+			Notifiers: notifierReconciler.Cache,
 			Rules: []merlinv1.Rule{
 				&merlinv1.ClusterRuleServiceInvalidSelector{},
 			},

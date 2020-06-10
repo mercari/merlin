@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kouzoh/merlin/notifiers/alert"
+	"github.com/kouzoh/merlin/alert"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -115,15 +115,11 @@ func TestSlack_SendAlert(t *testing.T) {
 
 			ts := httptest.NewServer(m)
 			defer ts.Close()
-			s := Slack{
-				Severity:   alert.SeverityInfo,
-				WebhookURL: ts.URL,
-				Channel:    channel,
-			}
+			s := NewClient(client, alert.SeverityInfo, ts.URL, channel)
 			if tc.wantErr {
-				assert.Error(t, s.SendAlert(client, tc.a))
+				assert.Error(tt, s.SendAlert(tc.a))
 			} else {
-				assert.NoError(t, s.SendAlert(client, tc.a))
+				assert.NoError(tt, s.SendAlert(tc.a))
 
 			}
 		})

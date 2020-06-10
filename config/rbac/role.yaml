@@ -91,6 +91,20 @@ rules:
   - patch
   - update
 - apiGroups:
+  - merlin.mercari.com
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - merlin.mercari.com
+  resources:
+  - secrets/status
+  verbs:
+  - get
+- apiGroups:
   - policy
   resources:
   - poddisruptionbudgets

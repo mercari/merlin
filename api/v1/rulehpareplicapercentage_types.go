@@ -68,7 +68,7 @@ type RuleHPAReplicaPercentage struct {
 func (r RuleHPAReplicaPercentage) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, object interface{}) (isViolated bool, message string, err error) {
 	hpa, ok := object.(autoscalingv1.HorizontalPodAutoscaler)
 	if !ok {
-		err = fmt.Errorf("unable to convert object to type %s", GetStructName(hpa))
+		err = fmt.Errorf("unable to convert object to type %T", hpa)
 		return
 	}
 	l.Info("evaluating", GetStructName(hpa), hpa.Name)

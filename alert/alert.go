@@ -45,6 +45,10 @@ type Alert struct {
 	Status Status `json:"status"`
 	// Error is the err from any issues for sending message to external system
 	Error string `json:"error"`
+	// Violated indicates if the alert is from rule violations, since all alerts stored in status should come from
+	// violations, the main reason this value exists is to simplify function calls and the determinations of alerts
+	// should recover or not.
+	Violated bool `json:"violated"`
 }
 
 func (a Alert) ParseMessage() (string, error) {

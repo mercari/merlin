@@ -84,7 +84,6 @@ func main() {
 	if err := controllers.SetupReconcilers(mgr); err != nil {
 		setupLog.Error(err, "unable to setup reconcilers")
 	}
-	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

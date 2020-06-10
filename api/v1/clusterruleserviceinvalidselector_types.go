@@ -68,7 +68,7 @@ type ClusterRuleServiceInvalidSelector struct {
 func (c ClusterRuleServiceInvalidSelector) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, object interface{}) (isViolated bool, message string, err error) {
 	svc, ok := object.(corev1.Service)
 	if !ok {
-		err = fmt.Errorf("unable to convert object to type %s", GetStructName(svc))
+		err = fmt.Errorf("unable to convert object to type %T", svc)
 		return
 	}
 	l.Info("evaluating", GetStructName(svc), svc.Name)

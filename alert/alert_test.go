@@ -35,7 +35,7 @@ func TestSeverity_Color(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(tt *testing.T) {
-			assert.Equal(t, tc.color, tc.severity.Color())
+			assert.Equal(tt, tc.color, tc.severity.Color())
 		})
 	}
 }

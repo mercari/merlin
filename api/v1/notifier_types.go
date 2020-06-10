@@ -17,15 +17,12 @@ package v1
 
 import (
 	"fmt"
-	"net/http"
-	"strings"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/kouzoh/merlin/notifiers/alert"
-	"github.com/kouzoh/merlin/notifiers/slack"
+	"github.com/kouzoh/merlin/alert"
+	"github.com/kouzoh/merlin/alert/slack"
 )
 
 const (
@@ -48,31 +45,25 @@ type NotifierSpec struct {
 	// NotifyInterval is the interval for notifier to check and sends notifications
 	NotifyInterval int64 `json:"notifyInterval"`
 	// Slack is the notifier for slack
-	Slack slack.Slack `json:"slack,omitempty"`
+	Slack slack.Spec `json:"slack,omitempty"`
 	// PagerDuty will be another notifier for slack
 }
 
 // NotifierStatus defines the observed state of Notifier, example:
-// CheckedAt: 2006-01-02T15:04:05Z07:00
-// Alerts:
-//   ClusterRuleHPA/ResourceNamespacedName1:
-//     Status: firing
-//     MessageTemplate: <message>
-//   ClusterRuleHPA/ResourceNamespacedName2:
-//     Status: pending
-//     MessageTemplate: <msg>
+// status:
+//   alerts:
+//     <RuleKind>/<RuleName>/<ResourceNamespacedName>:
+//       resourceKind: HorizontalPodAutoscaler
+//       resourceName: default/nginx
+//       severity: warning
+//       status: firing
+//       suppressed: false
+//   checkedAt: 2006-01-02T15:04:05Z07:00
 type NotifierStatus struct {
 	// CheckedAt is the last check time of the notifier
 	CheckedAt string `json:"checkedAt"`
 	// Alerts are the map of alerts currently firing/pending for objects violate the rule
 	Alerts map[string]alert.Alert `json:"alerts,omitempty"`
-}
-
-func (n NotifierStatus) ListAlerts() (list []string) {
-	for k := range n.Alerts {
-		list = append(list, k)
-	}
-	return list
 }
 
 // +kubebuilder:object:root=true
@@ -86,105 +77,6 @@ type Notifier struct {
 
 	Spec   NotifierSpec   `json:"spec,omitempty"`
 	Status NotifierStatus `json:"status,omitempty"`
-}
-
-func (n *Notifier) Notify(client *http.Client) {
-	for name, a := range n.Status.Alerts {
-		if a.Suppressed {
-			continue
-		}
-
-		if a.Status != alert.StatusFiring { // wont send again if already firing
-			if n.Spec.Slack.Channel != "" {
-				err := n.Spec.Slack.SendAlert(client, a)
-				if err != nil {
-					a.Error = err.Error()
-					a.Status = alert.StatusError
-				} else {
-					a.Error = ""
-					if a.Status == alert.StatusPending || a.Status == "" {
-						a.Status = alert.StatusFiring
-					}
-				}
-
-			} else {
-				// TODO: add pagerduty, note if they'll co-exists then we'll need other Status/Error fields for PagerDuty
-			}
-		}
-
-		if a.Status == alert.StatusRecovering {
-			delete(n.Status.Alerts, name)
-		} else {
-			n.Status.Alerts[name] = a
-		}
-	}
-	n.Status.CheckedAt = time.Now().Format(time.RFC3339)
-}
-
-func (n *Notifier) SetAlert(ruleKind, ruleName string, newAlert alert.Alert, isViolated bool) {
-	name := strings.Join([]string{ruleKind, ruleName, newAlert.ResourceName}, Separator)
-	if n.Status.Alerts == nil {
-		n.Status.Alerts = map[string]alert.Alert{}
-	}
-
-	if newAlert.Severity == alert.SeverityDefault {
-		if n.Spec.Slack.Severity != "" {
-			newAlert.Severity = n.Spec.Slack.Severity
-		}
-	}
-
-	if isViolated {
-		if a, ok := n.Status.Alerts[name]; !ok {
-			newAlert.Status = alert.StatusPending
-		} else if a.Status == alert.StatusRecovering || a.Status == alert.StatusFiring {
-			newAlert.Status = alert.StatusFiring
-		}
-		n.Status.Alerts[name] = newAlert
-	} else {
-		if a, ok := n.Status.Alerts[name]; ok {
-			if a.Status == alert.StatusPending {
-				delete(n.Status.Alerts, name)
-			} else {
-				newAlert.Status = alert.StatusRecovering
-				n.Status.Alerts[name] = newAlert
-			}
-		}
-	}
-}
-
-func (n *Notifier) ClearAllAlerts(message string) {
-	if n.Status.Alerts == nil {
-		n.Status.Alerts = map[string]alert.Alert{}
-	}
-	for k := range n.Status.Alerts {
-		newAlert := n.Status.Alerts[k]
-		newAlert.Status = alert.StatusRecovering
-		newAlert.Message = message + " " + n.Status.Alerts[k].Message
-		n.Status.Alerts[k] = newAlert
-	}
-	return
-}
-
-func (n *Notifier) ClearRuleAlerts(ruleKind, ruleName, message string) {
-	key := strings.Join([]string{ruleKind, ruleName}, Separator)
-	if n.Status.Alerts == nil {
-		n.Status.Alerts = map[string]alert.Alert{}
-	}
-	for k := range n.Status.Alerts {
-		alertRuleKey := strings.Join(strings.Split(k, Separator)[:2], Separator)
-		if alertRuleKey == key {
-			newAlert := n.Status.Alerts[k]
-			newAlert.Status = alert.StatusRecovering
-			newAlert.Message = message + " " + n.Status.Alerts[k].Message
-			n.Status.Alerts[k] = newAlert
-		}
-	}
-	return
-}
-
-type NotifiersCache struct {
-	Notifiers map[string]*Notifier
-	IsReady   bool
 }
 
 func init() {

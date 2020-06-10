@@ -37,4 +37,7 @@ resources:
 - group: merlin
   kind: ClusterRuleServiceInvalidSelector
   version: v1
+- group: merlin
+  kind: ClusterRuleSecretUnused
+  version: v1
 version: "2"

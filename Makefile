@@ -25,7 +25,6 @@ test: generate imports vet manifests ## Run tests
 manager: generate imports vet ## Build manager binary
 	go build -o bin/manager main.go
 
-
 run: generate imports vet manifests ## Run against the configured Kubernetes cluster in ~/.kube/config
 	go run ./main.go
 
@@ -73,6 +72,12 @@ docker-build: test ## Build the docker image
 docker-push: ## Push the docker image
 	docker push ${IMG}
 
+vendor: ## Getting libraries to vendor folder
+	go mod vendor
+
+mockgen: vendor ## Gen mocks - currently only k8s cilent mock
+	mockgen -package mocks -source vendor/sigs.k8s.io/controller-runtime/pkg/client/interfaces.go -destination mocks/k8s_client_mock.go
+
 controller-gen: ## find controller-gen, download controller-gen if necessary
 ifeq (, $(shell which controller-gen))
 	@{ \
@@ -80,7 +85,7 @@ ifeq (, $(shell which controller-gen))
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONTROLLER_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.4 ;\
+	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.9 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
 CONTROLLER_GEN=$(GOBIN)/controller-gen

@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/kouzoh/merlin/notifiers/alert"
+	"github.com/kouzoh/merlin/alert"
 )
 
 type BlockType string
@@ -19,15 +19,6 @@ const (
 	TextTypeMarkdown  TextType = "mrkdwn"
 	TextTypePlainText TextType = "plain_text"
 )
-
-type Slack struct {
-	// Severity is the severity of the issue, one of info, warning, critical, or fatal
-	Severity alert.Severity `json:"severity"`
-	// WebhookURL is the WebhookURL from slack
-	WebhookURL string `json:"webhookURL"`
-	// Channel is the slack channel this notification should use
-	Channel string `json:"channel"`
-}
 
 type Request struct {
 	Channel     string       `json:"channel"`
@@ -59,7 +50,32 @@ type BlockSectionField struct {
 	Emoji bool     `json:"emoji,omitempty"`
 }
 
-func (s *Slack) SendAlert(client *http.Client, a alert.Alert) error {
+type Client struct {
+	Spec
+	HttpClient *http.Client `json:"-"`
+}
+
+type Spec struct {
+	// Severity is the severity of the issue, one of info, warning, critical, or fatal
+	Severity alert.Severity `json:"severity"`
+	// WebhookURL is the WebhookURL from slack
+	WebhookURL string `json:"webhookURL"`
+	// Channel is the slack channel this notification should use
+	Channel string `json:"channel"`
+}
+
+func NewClient(cli *http.Client, severity alert.Severity, webhookURL, channel string) *Client {
+	return &Client{
+		HttpClient: cli,
+		Spec: Spec{
+			Severity:   severity,
+			WebhookURL: webhookURL,
+			Channel:    channel,
+		},
+	}
+}
+
+func (s *Client) SendAlert(a alert.Alert) error {
 	if a.ResourceKind == "" || a.ResourceName == "" || a.Message == "" {
 		return fmt.Errorf("alert's ResourceKind, ResourceName, and Message are required")
 	}
@@ -102,7 +118,7 @@ func (s *Slack) SendAlert(client *http.Client, a alert.Alert) error {
 	}
 
 	req.Header.Add("Content-Type", "application/json")
-	resp, err := client.Do(req)
+	resp, err := s.HttpClient.Do(req)
 	if err != nil {
 		return err
 	}

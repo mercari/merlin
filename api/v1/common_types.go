@@ -6,8 +6,9 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/kouzoh/merlin/alert"
+
 	"github.com/go-logr/logr"
-	"github.com/kouzoh/merlin/notifiers/alert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
