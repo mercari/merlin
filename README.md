@@ -1,14 +1,14 @@
-[![CircleCI](https://circleci.com/gh/kouzoh/merlin.svg?style=svg&circle-token=5c9140edab4f649c6f3585fde235e63e093dd791)](https://circleci.com/gh/kouzoh/merlin)
-
 # Merlin
+
+[![CircleCI](https://circleci.com/gh/kouzoh/merlin.svg?style=svg&circle-token=5c9140edab4f649c6f3585fde235e63e093dd791)](https://circleci.com/gh/kouzoh/merlin)
 
 An agent that sends out alerts when kubernetes resources are misconfigured or have issues based on rules.
 
 ## Technical background and designs
 
-You can find the technical backgrounds and design in [ERD](https://docs.google.com/document/d/1KB0cSwG6b_h9vW5qpq-am9YFDYod3sRLBHpY4gF4m68/edit#)
+Please see [Docs](https://github.com/kouzoh/merlin/tree/master/docs) for detailed documentations
 
-## Install
+## Installation
 
 ### Install CRDs
 In order to install merlin, you'll need to install the CRD (custom resource definition) first, run
@@ -51,11 +51,13 @@ You can run the tests with
 make test
 ```
 
-By default this uses [`envtest`](https://github.com/kubernetes-sigs/controller-runtime/tree/master/pkg/envtest)
+By default controller tests use [`envtest`](https://github.com/kubernetes-sigs/controller-runtime/tree/master/pkg/envtest)
 to run the tests, but you can change it to use existing cluster by setting environment varialbe `USE_EXISTING_CLUSTER=1`
 
 for references, [here](https://github.com/kubernetes-sigs/controller-runtime/blob/528cd19ee0de5d4732234566f756ef75f8c5ce77/pkg/envtest/server.go#L37-L45) 
 is the list of environment variables can be used to change `envtest`'s behavior.
+
+Other tests uses [testing](https://golang.org/pkg/testing/) and [mock](https://github.com/golang/mock) for unit testing and mocking API calls. 
 
 ## Debugging with existing cluster
 You can also run the controllers locally against an existing cluster that your kube config points to, just run 
@@ -64,4 +66,18 @@ make run
 ``` 
 
 
+## Committers
 
+ * Bill Chung ([@billcchung](https://github.com/billcchung))
+
+## Contribution
+
+Please read the CLA below carefully before submitting your contribution.
+
+https://www.mercari.com/cla/
+
+## License
+
+Copyright 2020 Mercari, Inc.
+
+Licensed under the Apache 2.0 License.
