@@ -57,7 +57,7 @@ var _ = Describe("SecretUnusedRuleControllerTests", func() {
 			if !isNotifierCreated {
 				Expect(k8sClient.Create(ctx, notifier)).Should(Succeed())
 				Eventually(func() map[string]*notifiers.Notifier {
-					return notifierReconciler.Cache.Notifiers
+					return notifierReconciler.cache.Notifiers
 				}, time.Second*5, time.Millisecond*200).Should(HaveKey(notifier.Name))
 			}
 			isNotifierCreated = true
@@ -87,7 +87,7 @@ var _ = Describe("SecretUnusedRuleControllerTests", func() {
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).Should(HaveKey(alertKey))
 			// alert should be added to notifier status
-			Expect(notifierReconciler.Cache.Notifiers[notifier.Name].Resource.Status.Alerts).Should(HaveKey(alertKey))
+			Expect(notifierReconciler.cache.Notifiers[notifier.Name].Resource.Status.Alerts).Should(HaveKey(alertKey))
 		})
 
 		It("TestCreatePodWithSecretShouldNotGetViolation", func() {
@@ -114,7 +114,7 @@ var _ = Describe("SecretUnusedRuleControllerTests", func() {
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).ShouldNot(HaveKey(alertKey))
 			// alert should be added to notifier status
-			Expect(notifierReconciler.Cache.Notifiers[notifier.Name].Resource.Status.Alerts).ShouldNot(HaveKey(alertKey))
+			Expect(notifierReconciler.cache.Notifiers[notifier.Name].Resource.Status.Alerts).ShouldNot(HaveKey(alertKey))
 		})
 	})
 

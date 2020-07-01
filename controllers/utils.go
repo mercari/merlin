@@ -2,10 +2,9 @@ package controllers
 
 import (
 	"fmt"
+	"math/rand"
 	"reflect"
-	"sync"
-
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	"time"
 )
 
 const (
@@ -22,12 +21,6 @@ func GetStructName(v interface{}) string {
 	}
 }
 
-// RuleStatusWithLock is the status of rule with lock
-type RuleStatusWithLock struct {
-	sync.Mutex
-	merlinv1.RuleStatus
-}
-
 // Helper functions to check and remove string from a slice of strings.
 func containsString(slice []string, s string) bool {
 	for _, item := range slice {
@@ -36,4 +29,11 @@ func containsString(slice []string, s string) bool {
 		}
 	}
 	return false
+}
+
+func requeueIntervalForError() time.Duration {
+	rand.Seed(time.Now().UnixNano())
+	min := 10
+	max := 30
+	return time.Duration(rand.Intn(max-min+1)+min) * time.Second
 }

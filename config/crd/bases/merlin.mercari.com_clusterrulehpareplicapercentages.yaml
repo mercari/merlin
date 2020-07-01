@@ -15,8 +15,6 @@ spec:
     plural: clusterrulehpareplicapercentages
     singular: clusterrulehpareplicapercentage
   scope: Cluster
-  subresources:
-    status: {}
   validation:
     openAPIV3Schema:
       description: ClusterRuleHPAReplicaPercentage is the Schema for the cluster rule
@@ -77,15 +75,6 @@ spec:
           required:
           - notification
           - percent
-          type: object
-        status:
-          properties:
-            checkedAt:
-              type: string
-            violations:
-              additionalProperties:
-                type: string
-              type: object
           type: object
       type: object
   version: v1

@@ -18,7 +18,6 @@ const (
 	StatusPending    Status = "pending"    // pending to send alert
 	StatusFiring     Status = "firing"     // alert currently firing
 	StatusRecovering Status = "recovering" // alert is recovering, but not yet notified to external systems
-	StatusError      Status = "error"
 
 	ColorGray   = "#B2B2B2"
 	ColorRed    = "#FF1717"

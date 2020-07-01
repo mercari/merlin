@@ -3,6 +3,7 @@ package rules
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/go-logr/zapr"
 	"github.com/golang/mock/gomock"
@@ -17,7 +18,7 @@ import (
 	"github.com/kouzoh/merlin/mocks"
 )
 
-func Test_SecretUnusedRule(t *testing.T) {
+func Test_SecretUnusedRuleBasic(t *testing.T) {
 	notification := merlinv1.Notification{
 		Notifiers:  []string{"testNotifier"},
 		Suppressed: true,
@@ -30,7 +31,7 @@ func Test_SecretUnusedRule(t *testing.T) {
 		},
 	}
 
-	r := &secretUnusedRule{resource: merlinv1Rule}
+	r := &SecretUnusedRule{resource: merlinv1Rule}
 	assert.Equal(t, merlinv1Rule.ObjectMeta, r.GetObjectMeta())
 	assert.Equal(t, notification, r.GetNotification())
 	assert.Equal(t, "ClusterRuleSecretUnused/test-r", r.GetName())
@@ -57,15 +58,28 @@ func Test_SecretUnusedRule_NewRule(t *testing.T) {
 				Notifiers:  []string{"testNotifier"},
 				Suppressed: true,
 			},
+			InitialDelaySeconds: 30,
 		},
 	}
-	r := NewSecretUnusedRule(mockClient, log)
-	assert.Equal(t, false, r.IsInitialized())
+	rule := &SecretUnusedRule{}
 	mockClient.EXPECT().Get(ctx, key, &merlinv1.ClusterRuleSecretUnused{}).SetArg(2, merlinv1Rule).Return(nil)
-	obj, err := r.GetObject(ctx, key)
+	r, err := rule.New(ctx, mockClient, log, key)
 	assert.NoError(t, err)
-	assert.Equal(t, &merlinv1Rule, obj)
-	assert.True(t, r.IsInitialized())
+	assert.Equal(t, &merlinv1Rule, r.GetObject())
+	delay, err := r.GetDelaySeconds(&corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			CreationTimestamp: metav1.Time{
+				Time: time.Now(),
+			},
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, time.Duration(30*time.Second), delay)
+	delay, err = r.GetDelaySeconds(&corev1.Pod{})
+	assert.NoError(t, err)
+	assert.Equal(t, time.Duration(0), delay)
+	_, err = r.GetDelaySeconds(&corev1.Namespace{})
+	assert.Error(t, err)
 }
 
 func Test_SecretUnusedRule_EvaluateAll(t *testing.T) {
@@ -75,7 +89,7 @@ func Test_SecretUnusedRule_EvaluateAll(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockClient := mocks.NewMockClient(mockCtrl)
 
-	r := &secretUnusedRule{
+	r := &SecretUnusedRule{
 		rule: rule{cli: mockClient, log: log, status: &Status{}},
 		resource: &merlinv1.ClusterRuleSecretUnused{
 			ObjectMeta: metav1.ObjectMeta{Name: "test-r"},

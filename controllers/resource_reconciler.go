@@ -16,31 +16,31 @@ import (
 
 type ResourceReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
-	// NotifierCache stores the notifiers as cache, this will be updated when any notifier updates happen,
+	log    logr.Logger
+	scheme *runtime.Scheme
+	// notifierCache stores the notifiers as cache, this will be updated when any notifier updates happen,
 	// and also serves as cache so we dont need to get list of notifiers every time
-	NotifierCache *notifiers.Cache
-	// Rules is the list of rules to apply for this reconciler
-	Rules []rules.Rule
-	// Resource is the kubernetes resource type that the controller watches.
-	Resource runtime.Object
+	notifierCache *notifiers.Cache
+	// rules is the list of rules cached to apply for this reconciler
+	rules []*rules.Cache
+	// resource is the kubernetes resource type that the controller watches.
+	resource runtime.Object
 }
 
 func (r *ResourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	l := r.Log.WithName("Reconcile").WithValues("req", req.NamespacedName)
-	if !r.NotifierCache.IsReady {
+	l := r.log.WithName("Reconcile").WithValues("req", req.NamespacedName)
+	if !r.notifierCache.IsReady {
 		l.V(1).Info("Notifier is not ready")
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
 	l.Info("reconciling")
-	object := r.Resource.DeepCopyObject()
+	object := r.resource.DeepCopyObject()
 	if err := r.Get(ctx, req.NamespacedName, object); err != nil {
 		if apierrs.IsNotFound(err) {
 			l.Info("resource is deleted, clear alerts")
-			for _, notifier := range r.NotifierCache.Notifiers {
+			for _, notifier := range r.notifierCache.Notifiers {
 				l.V(1).Info("removing alert from notifier", "notifier", notifier.Resource.Name)
 				notifier.ClearResourceAlerts(req.NamespacedName.String(), "recover alert since resource is deleted")
 				return ctrl.Result{}, nil
@@ -50,14 +50,22 @@ func (r *ResourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		l.Error(err, "unable to retrieve the object")
 		return ctrl.Result{RequeueAfter: requeueIntervalForError()}, err
 	}
+	var rulesToApply []rules.Rule
+
+	for _, rulePool := range r.rules {
+		if namespaceRules, ok := rulePool.LoadNamespaced(req.Namespace); ok {
+			for _, namespaceRule := range namespaceRules {
+				rulesToApply = append(rulesToApply, namespaceRule)
+			}
+		} else if clusterRules, ok := rulePool.LoadNamespaced(""); ok {
+			for _, clusterRule := range clusterRules {
+				rulesToApply = append(rulesToApply, clusterRule)
+			}
+		}
+	}
 
 	allRulesAreReady := true
-	for _, rule := range r.Rules {
-		if !rule.IsInitialized() {
-			// user has not yet created rule for this yet, just continue
-			l.V(1).Info("rule is not initialized, skipping", "rule", rule.GetName())
-			continue
-		}
+	for _, rule := range rulesToApply {
 		if !rule.IsReady() {
 			// skip the rule if it's not ready, maybe being created or updated
 			l.V(1).Info("rule is not ready, skipping", "rule", rule.GetName())
@@ -70,7 +78,7 @@ func (r *ResourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			return ctrl.Result{RequeueAfter: requeueIntervalForError()}, err
 		}
 		for _, n := range rule.GetNotification().Notifiers {
-			notifier, ok := r.NotifierCache.Notifiers[n]
+			notifier, ok := r.notifierCache.Notifiers[n]
 			if !ok {
 				l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
 				continue
@@ -88,20 +96,20 @@ func (r *ResourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 func (r *ResourceReconciler) SetupWithManager(mgr ctrl.Manager, indexingFunc func(rawObj runtime.Object) []string) error {
 	ctx := context.Background()
-	l := r.Log.WithName("SetupWithManager")
+	l := r.log.WithName("SetupWithManager")
 	l.V(1).Info("getting field indexer for resource")
 
 	if err := mgr.
 		GetFieldIndexer().
-		IndexField(ctx, r.Resource, metadataNameField, indexingFunc); err != nil {
+		IndexField(ctx, r.resource, metadataNameField, indexingFunc); err != nil {
 		return err
 	}
 
-	l.Info("initialize manager", "rules", r.Rules)
+	l.Info("initialize manager", "rules", r.rules)
 	return ctrl.
 		NewControllerManagedBy(mgr).
-		For(r.Resource).
+		For(r.resource).
 		WithEventFilter(&EventFilter{Log: l}).
-		Named(GetStructName(r.Resource)).
+		Named(GetStructName(r.resource)).
 		Complete(r)
 }

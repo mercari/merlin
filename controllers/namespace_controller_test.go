@@ -56,7 +56,7 @@ var _ = Describe("NamespaceControllerTests", func() {
 			if !isNotifierCreated {
 				Expect(k8sClient.Create(ctx, notifier)).Should(Succeed())
 				Eventually(func() map[string]*notifiers.Notifier {
-					return notifierReconciler.Cache.Notifiers
+					return notifierReconciler.cache.Notifiers
 				}, time.Second*5, time.Millisecond*200).Should(HaveKey(notifier.Name))
 			}
 			isNotifierCreated = true
@@ -88,27 +88,20 @@ var _ = Describe("NamespaceControllerTests", func() {
 			Expect(rule.Name).To(Equal(rule.Name))
 			Expect(rule.Spec.Notification.Notifiers[0]).To(Equal(notifier.Name))
 
-			By("Rule has alert")
-			Eventually(func() map[string]string {
-				r := &merlinv1.ClusterRuleNamespaceRequiredLabel{}
-				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: rule.Name}, r)).Should(Succeed())
-				return r.Status.Violations
-			}, time.Second*5, time.Millisecond*200).Should(HaveKey(namespacedName.String()))
-
 			By("Alert should be added to notifier status")
 			Eventually(func() map[string]alert.Alert {
 				n := &merlinv1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).Should(HaveKey(alertKey))
-			Expect(notifierReconciler.Cache.Notifiers[notifier.Name].Resource.Status.Alerts).Should(HaveKey(alertKey))
+			Expect(notifierReconciler.cache.Notifiers[notifier.Name].Resource.Status.Alerts).Should(HaveKey(alertKey))
 
 			By("Ignored Namespace should not have alert")
 			ignoredAlertKey := strings.Join([]string{ruleStructName, rule.Name, "", kubeSystemNamespace}, Separator)
 			n := &merlinv1.Notifier{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 			Expect(n.Status.Alerts).ShouldNot(HaveKey(ignoredAlertKey))
-			Expect(notifierReconciler.Cache.Notifiers[notifier.Name].Resource.Status.Alerts).ShouldNot(HaveKey(ignoredAlertKey))
+			Expect(notifierReconciler.cache.Notifiers[notifier.Name].Resource.Status.Alerts).ShouldNot(HaveKey(ignoredAlertKey))
 		})
 
 		It("TestRemoveRuleShouldRemoveViolation", func() {
@@ -119,27 +112,22 @@ var _ = Describe("NamespaceControllerTests", func() {
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).ShouldNot(HaveKey(alertKey))
-			Expect(notifierReconciler.Cache.Notifiers[notifier.Name].Resource.Status.Alerts).ShouldNot(HaveKey(alertKey))
+			Expect(notifierReconciler.cache.Notifiers[notifier.Name].Resource.Status.Alerts).ShouldNot(HaveKey(alertKey))
 		})
 
 		It("TestRecreateRuleShouldGetViolationsForExistingNamespace", func() {
 			rule.Name = rule.Name + "-recreate"
 			rule.ResourceVersion = ""
-			rule.Status = merlinv1.RuleStatus{}
 			alertKey := strings.Join([]string{ruleStructName, rule.Name, namespacedName.String()}, Separator)
 			Expect(k8sClient.Create(ctx, rule)).Should(Succeed(), "Failed to recreate rule")
-			Eventually(func() map[string]string {
-				r := &merlinv1.ClusterRuleNamespaceRequiredLabel{}
-				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: rule.Name}, r)).Should(Succeed())
-				return r.Status.Violations
-			}, time.Second*3, time.Millisecond*200).Should(HaveKey(namespacedName.String()))
-			// alert should be added to notifier status
-			Expect(notifierReconciler.Cache.Notifiers[notifier.Name].Resource.Status.Alerts).Should(HaveKey(alertKey))
+
+			By("Alert should be added to notifier status")
 			Eventually(func() map[string]alert.Alert {
 				n := &merlinv1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).Should(HaveKey(alertKey))
+			Expect(notifierReconciler.cache.Notifiers[notifier.Name].Resource.Status.Alerts).Should(HaveKey(alertKey))
 		})
 	})
 })

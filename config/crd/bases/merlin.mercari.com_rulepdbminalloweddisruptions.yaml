@@ -15,8 +15,6 @@ spec:
     plural: rulepdbminalloweddisruptions
     singular: rulepdbminalloweddisruption
   scope: Namespaced
-  subresources:
-    status: {}
   validation:
     openAPIV3Schema:
       description: RulePDBMinAllowedDisruption is the Schema for the rulepdbminalloweddisruptions
@@ -84,15 +82,6 @@ spec:
           required:
           - notification
           - selector
-          type: object
-        status:
-          properties:
-            checkedAt:
-              type: string
-            violations:
-              additionalProperties:
-                type: string
-              type: object
           type: object
       type: object
   version: v1

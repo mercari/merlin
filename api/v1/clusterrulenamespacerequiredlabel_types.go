@@ -16,14 +16,7 @@ limitations under the License.
 package v1
 
 import (
-	"context"
-	"fmt"
-
-	"github.com/go-logr/logr"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // ClusterRuleNamespaceRequiredLabelSpec defines the desired state of ClusterRuleNamespaceRequiredLabel
@@ -45,100 +38,15 @@ type ClusterRuleNamespaceRequiredLabelList struct {
 	Items           []ClusterRuleNamespaceRequiredLabel `json:"items"`
 }
 
-func (c ClusterRuleNamespaceRequiredLabelList) ListItems() []Rule {
-	var items []Rule
-	for _, i := range c.Items {
-		items = append(items, &i)
-	}
-	return items
-}
-
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
-// +kubebuilder:subresource:status
 
 // ClusterRuleNamespaceRequiredLabel is the Schema for the clusterrulenamespacerequiredlabels API
 type ClusterRuleNamespaceRequiredLabel struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ClusterRuleNamespaceRequiredLabelSpec `json:"spec,omitempty"`
-	Status RuleStatus                            `json:"status,omitempty"`
-}
-
-func (c ClusterRuleNamespaceRequiredLabel) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, object interface{}) (isViolated bool, message string, err error) {
-	namespace, ok := object.(corev1.Namespace)
-	if !ok {
-		err = fmt.Errorf("unable to convert object to type %T", namespace)
-		return
-	}
-	l.Info("evaluating", GetStructName(namespace), namespace.Name)
-
-	if message, err = c.Spec.Label.Validate(namespace.GetLabels()); err != nil {
-		return
-	}
-	if message != "" {
-		isViolated = true
-	}
-	return
-}
-
-func (c ClusterRuleNamespaceRequiredLabel) GetStatus() RuleStatus {
-	return c.Status
-}
-
-func (c ClusterRuleNamespaceRequiredLabel) List() RuleList {
-	return &ClusterRuleNamespaceRequiredLabelList{}
-}
-
-func (c ClusterRuleNamespaceRequiredLabel) IsNamespaceIgnored(namespace string) bool {
-	return IsStringInSlice(c.Spec.IgnoreNamespaces, namespace)
-}
-
-func (c ClusterRuleNamespaceRequiredLabel) GetNamespacedRuleList() RuleList {
-	return nil
-}
-
-func (c ClusterRuleNamespaceRequiredLabel) GetNotification() Notification {
-	return c.Spec.Notification
-}
-
-func (c *ClusterRuleNamespaceRequiredLabel) SetViolationStatus(name types.NamespacedName, isViolated bool) {
-	c.Status.SetViolation(name, isViolated)
-}
-
-func (c ClusterRuleNamespaceRequiredLabel) GetResourceList() ResourceList {
-	return &coreV1NamespaceList{}
-}
-
-func (c ClusterRuleNamespaceRequiredLabel) IsNamespacedRule() bool {
-	return false
-}
-
-func (c ClusterRuleNamespaceRequiredLabel) GetSelector() *Selector {
-	return nil
-}
-
-func (c ClusterRuleNamespaceRequiredLabel) GetObjectNamespacedName(object interface{}) (namespacedName types.NamespacedName, err error) {
-	namespace, ok := object.(corev1.Namespace)
-	if !ok {
-		err = fmt.Errorf("unable to convert object to type %T", namespace)
-		return
-	}
-	namespacedName = types.NamespacedName{Namespace: namespace.Namespace, Name: namespace.Name}
-	return
-}
-
-func (c ClusterRuleNamespaceRequiredLabel) GetObjectMeta() metav1.ObjectMeta {
-	return c.ObjectMeta
-}
-
-func (c *ClusterRuleNamespaceRequiredLabel) SetFinalizer(finalizer string) {
-	c.ObjectMeta.Finalizers = append(c.ObjectMeta.Finalizers, finalizer)
-}
-
-func (c *ClusterRuleNamespaceRequiredLabel) RemoveFinalizer(finalizer string) {
-	removeString(c.ObjectMeta.Finalizers, finalizer)
+	Spec ClusterRuleNamespaceRequiredLabelSpec `json:"spec,omitempty"`
 }
 
 func init() {

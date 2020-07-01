@@ -5,42 +5,54 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/kouzoh/merlin/notifiers"
+	"github.com/kouzoh/merlin/rules"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	"github.com/kouzoh/merlin/notifiers"
-	"github.com/kouzoh/merlin/rules"
 )
+
+const FinalizerName = "rule.finalizers.merlin.mercari.com"
 
 type RuleReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
-	// NotifierCache stores the notifiers as cache, this will be updated when any notifier updates happen,
+	log    logr.Logger
+	scheme *runtime.Scheme
+	// notifierCache stores the notifiers as cache, this will be updated when any notifier updates happen,
 	// and also servers as cache so we dont need to get list of notifiers every time
-	NotifierCache *notifiers.Cache
-	// Rule is the rule that this reconcilers will setup and evaluate.
-	Rule rules.Rule
+	notifierCache *notifiers.Cache
+	// rules is the rules cache that this reconcilers will setup and evaluate.
+	rules *rules.Cache
+	// ruleFactory generates new rule when there's any rule change/update/delete events.
+	ruleFactory rules.RuleFactory
 }
 
 func (r *RuleReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	l := r.Log.WithName("Reconcile").WithValues("rule", req.NamespacedName)
-	if !r.NotifierCache.IsReady {
+	l := r.log.WithName("Reconcile").WithValues("rule", req.NamespacedName)
+	if !r.notifierCache.IsReady {
 		l.V(1).Info("Notifier is not ready")
 		return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
 	}
 
-	l.Info("Reconciling for rule for rule changed/created")
-	rule := r.Rule
-	rule.SetReady(false)
-	ruleObject, err := rule.GetObject(ctx, req.NamespacedName)
-	if err != nil {
-		return ctrl.Result{RequeueAfter: requeueIntervalForError()}, err
-	}
+	l.Info("Reconciling for rule changed/created")
 
+	rule, err := r.ruleFactory.New(ctx, r.Client, l, req.NamespacedName)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			l.Info("rule is deleted")
+			return ctrl.Result{}, nil
+		}
+		l.Error(err, "Failed to get rule")
+		return ctrl.Result{}, err
+	}
+	rule.SetReady(false)
+	r.rules.Save(req.Namespace, req.Name, rule)
+	l.V(1).Info("rules to reconcile", "rules", r.rules)
+
+	ruleObject := rule.GetObject()
 	if rule.GetObjectMeta().DeletionTimestamp.IsZero() {
 		if !containsString(rule.GetObjectMeta().Finalizers, FinalizerName) {
 			l.V(1).Info("Setting finalizer", "finalizer", FinalizerName)
@@ -53,13 +65,14 @@ func (r *RuleReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	} else if containsString(rule.GetObjectMeta().Finalizers, FinalizerName) {
 		l.Info("Rule is being delete, clear alerts")
 		for _, n := range rule.GetNotification().Notifiers { // TODO: simplify this?
-			notifier, ok := r.NotifierCache.Notifiers[n]
+			notifier, ok := r.notifierCache.Notifiers[n]
 			if !ok {
 				l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
 				continue
 			}
-			l.V(1).Info("removing alert from notifier", "notifier", notifier.Resource.Name)
-			notifier.ClearRuleAlerts(GetStructName(ruleObject)+Separator+req.NamespacedName.String(), "recover alert since rule is being deleted")
+			l.V(1).Info("removing alert from notifier", "notifier", notifier.Resource.Name, "ruleName", rule.GetName())
+			notifier.ClearRuleAlerts(rule.GetName(), "recover alert since rule is being deleted")
+			r.rules.Delete(req.Namespace, req.Name)
 			rule.RemoveFinalizer(FinalizerName)
 			if err := r.Update(ctx, ruleObject); err != nil {
 				l.Error(err, "Failed to remove finalizer")
@@ -76,7 +89,7 @@ func (r *RuleReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	for _, n := range rule.GetNotification().Notifiers { // TODO: simplify this?
-		notifier, ok := r.NotifierCache.Notifiers[n]
+		notifier, ok := r.notifierCache.Notifiers[n]
 		if !ok {
 			l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
 			continue
@@ -93,7 +106,7 @@ func (r *RuleReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 func (r *RuleReconciler) SetupWithManager(mgr ctrl.Manager, clusterRule, namespaceRule runtime.Object, indexingFunc func(rawObj runtime.Object) []string) error {
 	ctx := context.Background()
-	l := r.Log.WithName("SetupWithManager")
+	l := r.log.WithName("SetupWithManager")
 
 	l.V(1).Info("getting field indexer for cluster rule")
 	if err := mgr.
@@ -116,6 +129,5 @@ func (r *RuleReconciler) SetupWithManager(mgr ctrl.Manager, clusterRule, namespa
 
 	return builder.
 		WithEventFilter(&EventFilter{Log: l}).
-		Named(GetStructName(r.Rule)).
 		Complete(r)
 }

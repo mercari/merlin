@@ -74,13 +74,13 @@ var _ = Describe("NotifierControllerTests", func() {
 		Expect(k8sClient.Create(ctx, testNotifier)).Should(Succeed())
 		By("test notifier should be added into notifier reconciler's cache")
 		Eventually(func() bool {
-			_, ok := notifierReconciler.Cache.Notifiers[testNotifier.Name]
+			_, ok := notifierReconciler.cache.Notifiers[testNotifier.Name]
 			return ok
 		}, time.Second*2, time.Millisecond*200).Should(Equal(true))
 	})
 
 	It("TestAddAlertToNotifier", func() {
-		notifier := notifierReconciler.Cache.Notifiers[testNotifier.Name]
+		notifier := notifierReconciler.cache.Notifiers[testNotifier.Name]
 		notifier.SetAlert(ruleName, testAlert)
 		By("Notifier cache should have the status")
 		a, ok := notifier.Resource.Status.Alerts[alertKey]
@@ -123,7 +123,7 @@ var _ = Describe("NotifierControllerTests", func() {
 	})
 
 	It("TestRemoveAlertFromNotifier", func() {
-		notifier := notifierReconciler.Cache.Notifiers[testNotifier.Name]
+		notifier := notifierReconciler.cache.Notifiers[testNotifier.Name]
 		testAlert.Violated = false
 		notifier.SetAlert(ruleName, testAlert)
 		expectAlert := alert.Alert{
@@ -153,7 +153,7 @@ var _ = Describe("NotifierControllerTests", func() {
 	It("TestRemoveNotifier", func() {
 		Expect(k8sClient.Delete(ctx, testNotifier)).Should(Succeed())
 		Eventually(func() map[string]*notifiers.Notifier {
-			return notifierReconciler.Cache.Notifiers
+			return notifierReconciler.cache.Notifiers
 		}, time.Second*2, time.Millisecond*200).ShouldNot(HaveKey(testNotifier.Name))
 	})
 })

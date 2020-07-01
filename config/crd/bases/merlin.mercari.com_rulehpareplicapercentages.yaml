@@ -15,8 +15,6 @@ spec:
     plural: rulehpareplicapercentages
     singular: rulehpareplicapercentage
   scope: Namespaced
-  subresources:
-    status: {}
   validation:
     openAPIV3Schema:
       description: RuleHPAReplicaPercentage is the Schema for the rulehpareplicapercentage
@@ -85,15 +83,6 @@ spec:
           - notification
           - percent
           - selector
-          type: object
-        status:
-          properties:
-            checkedAt:
-              type: string
-            violations:
-              additionalProperties:
-                type: string
-              type: object
           type: object
       type: object
   version: v1

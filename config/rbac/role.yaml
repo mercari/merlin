@@ -25,6 +25,38 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - clusterrulenamespacerequiredlabel
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - clusterrulepdbinvalidselector
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - clusterrulepdbminalloweddisruption
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - clusterruleserviceinvalidselector
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - namespaces
   verbs:
   - get
@@ -59,6 +91,14 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - rulepdbminalloweddisruption
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - service
   verbs:
   - get
@@ -70,6 +110,30 @@ rules:
   - service/status
   verbs:
   - get
+- apiGroups:
+  - merlin.mercari.com
+  resources:
+  - clusterrulehpainvalidscaletargetref
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - merlin.mercari.com
+  resources:
+  - clusterrulehpareplicapercentage
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - merlin.mercari.com
+  resources:
+  - clusterrulesecretunused
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - merlin.mercari.com
   resources:
@@ -90,6 +154,14 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - merlin.mercari.com
+  resources:
+  - rulehpareplicapercentage
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - merlin.mercari.com
   resources:

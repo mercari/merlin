@@ -33,7 +33,6 @@ func (n *Notifier) Notify() {
 				err := slackClient.SendAlert(a)
 				if err != nil {
 					a.Error = err.Error()
-					a.Status = alert.StatusError
 				} else {
 					a.Error = ""
 					if a.Status == alert.StatusPending || a.Status == "" {
@@ -57,10 +56,6 @@ func (n *Notifier) Notify() {
 
 func (n *Notifier) SetAlert(rule string, newAlert alert.Alert) {
 	name := getAlertName(rule, newAlert.ResourceName)
-	if n.Resource.Status.Alerts == nil {
-		n.Resource.Status.Alerts = map[string]alert.Alert{}
-	}
-
 	if newAlert.Severity == alert.SeverityDefault {
 		if n.Resource.Spec.Slack.Severity != "" {
 			newAlert.Severity = n.Resource.Spec.Slack.Severity
@@ -87,9 +82,6 @@ func (n *Notifier) SetAlert(rule string, newAlert alert.Alert) {
 }
 
 func (n *Notifier) ClearAllAlerts(message string) {
-	if n.Resource.Status.Alerts == nil {
-		n.Resource.Status.Alerts = map[string]alert.Alert{}
-	}
 	for k := range n.Resource.Status.Alerts {
 		newAlert := n.Resource.Status.Alerts[k]
 		newAlert.Status = alert.StatusRecovering
@@ -100,9 +92,6 @@ func (n *Notifier) ClearAllAlerts(message string) {
 }
 
 func (n *Notifier) ClearRuleAlerts(rule, message string) {
-	if n.Resource.Status.Alerts == nil {
-		n.Resource.Status.Alerts = map[string]alert.Alert{}
-	}
 	for name, a := range n.Resource.Status.Alerts {
 		if rule == getRuleName(name, a.ResourceName) {
 			newAlert := n.Resource.Status.Alerts[name]
@@ -115,9 +104,6 @@ func (n *Notifier) ClearRuleAlerts(rule, message string) {
 }
 
 func (n *Notifier) ClearResourceAlerts(resource, message string) {
-	if n.Resource.Status.Alerts == nil {
-		n.Resource.Status.Alerts = map[string]alert.Alert{}
-	}
 	for name := range n.Resource.Status.Alerts {
 		if resource == getResourceName(name) {
 			newAlert := n.Resource.Status.Alerts[name]

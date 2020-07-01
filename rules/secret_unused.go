@@ -8,7 +8,6 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -17,67 +16,55 @@ import (
 	merlinv1 "github.com/kouzoh/merlin/api/v1"
 )
 
-type secretUnusedRule struct {
-	// clusterResource is the api resource this Rule uses
+type SecretUnusedRule struct {
+	// resource is the api resource this Rule uses
 	resource *merlinv1.ClusterRuleSecretUnused
 	rule
 }
 
-func NewSecretUnusedRule(cli client.Client, logger logr.Logger) Rule {
-	return &secretUnusedRule{
-		resource: &merlinv1.ClusterRuleSecretUnused{},
-		rule: rule{
-			cli:    cli,
-			log:    logger,
-			status: &Status{},
-		}}
-}
-
-func (s secretUnusedRule) IsInitialized() bool {
-	return s.isClusterResourceInitialized
-}
-
-func (s *secretUnusedRule) GetObject(ctx context.Context, key client.ObjectKey) (runtime.Object, error) {
+func (s *SecretUnusedRule) New(ctx context.Context, cli client.Client, logger logr.Logger, key client.ObjectKey) (Rule, error) {
+	s.cli = cli
+	s.log = logger
+	s.status = &Status{}
+	s.resource = &merlinv1.ClusterRuleSecretUnused{}
 	if err := s.cli.Get(ctx, key, s.resource); err != nil {
-		if apierrs.IsNotFound(err) {
-			s.log.Info("rule does not exist")
-			s.isClusterResourceInitialized = false
-			return s.resource, nil
-		}
-		return s.resource, err
+		return nil, err
 	}
-	s.isClusterResourceInitialized = true
-	return s.resource, nil
+	return s, nil
 }
 
-func (s secretUnusedRule) GetName() string {
-	return strings.Join([]string{merlinv1.GetStructName(s.resource), s.resource.Name}, Separator)
+func (s *SecretUnusedRule) GetObject() runtime.Object {
+	return s.resource
 }
 
-func (s secretUnusedRule) GetObjectMeta() metav1.ObjectMeta {
+func (s SecretUnusedRule) GetName() string {
+	return strings.Join([]string{getStructName(s.resource), s.resource.Name}, Separator)
+}
+
+func (s SecretUnusedRule) GetObjectMeta() metav1.ObjectMeta {
 	return s.resource.ObjectMeta
 }
 
-func (s secretUnusedRule) GetNotification() merlinv1.Notification {
+func (s SecretUnusedRule) GetNotification() merlinv1.Notification {
 	return s.resource.Spec.Notification
 }
 
-func (s *secretUnusedRule) SetFinalizer(finalizer string) {
+func (s *SecretUnusedRule) SetFinalizer(finalizer string) {
 	s.resource.ObjectMeta.Finalizers = append(s.resource.ObjectMeta.Finalizers, finalizer)
 }
 
-func (s *secretUnusedRule) RemoveFinalizer(finalizer string) {
+func (s *SecretUnusedRule) RemoveFinalizer(finalizer string) {
 	s.resource.ObjectMeta.Finalizers = removeString(s.resource.ObjectMeta.Finalizers, finalizer)
 }
 
-func (s *secretUnusedRule) EvaluateAll(ctx context.Context) (alerts []alert.Alert, err error) {
+func (s *SecretUnusedRule) EvaluateAll(ctx context.Context) (alerts []alert.Alert, err error) {
 	secrets := &corev1.SecretList{}
 	if err = s.cli.List(ctx, secrets); err != nil {
 		return
 	}
 
 	if len(secrets.Items) == 0 {
-		s.log.Info("no secrets found")
+		s.log.Info("no resource found")
 		return
 	}
 	for _, secret := range secrets.Items {
@@ -95,10 +82,13 @@ func (s *secretUnusedRule) EvaluateAll(ctx context.Context) (alerts []alert.Aler
 	return
 }
 
-func (s *secretUnusedRule) Evaluate(ctx context.Context, object interface{}) (a alert.Alert, err error) {
+func (s *SecretUnusedRule) Evaluate(ctx context.Context, object interface{}) (a alert.Alert, err error) {
 	secret, isSecret := object.(*corev1.Secret)
 	pod, isPod := object.(*corev1.Pod)
-	if isSecret && secret.Type == corev1.SecretTypeOpaque {
+	if isSecret {
+		if secret.Type != corev1.SecretTypeOpaque {
+			return
+		}
 		return s.evaluateSecret(ctx, secret)
 	} else if isPod {
 		return s.evaluatePod(ctx, pod)
@@ -107,20 +97,20 @@ func (s *secretUnusedRule) Evaluate(ctx context.Context, object interface{}) (a 
 	return
 }
 
-func (s *secretUnusedRule) evaluatePod(ctx context.Context, pod *corev1.Pod) (a alert.Alert, err error) {
+func (s *SecretUnusedRule) evaluatePod(ctx context.Context, pod *corev1.Pod) (a alert.Alert, err error) {
 	a = alert.Alert{
 		Suppressed:      s.resource.Spec.Notification.Suppressed,
 		Severity:        s.resource.Spec.Notification.Severity,
 		MessageTemplate: s.resource.Spec.Notification.CustomMessageTemplate,
 		Message:         "secret is not being used",
-		ResourceKind:    merlinv1.GetStructName(corev1.Secret{}),
+		ResourceKind:    getStructName(corev1.Secret{}),
 		Violated:        true,
 	}
-	if s.status.CheckedAt == nil || len(s.status.Violations) == 0 {
+	if s.status.checkedAt == nil || len(s.status.violations) == 0 {
 		a.Violated = false
 		return
 	}
-	for secret := range s.status.Violations {
+	for secret := range s.status.getViolations() {
 		key := client.ObjectKey{
 			Namespace: strings.Split(secret, Separator)[0],
 			Name:      strings.Split(secret, Separator)[1]}
@@ -133,7 +123,7 @@ func (s *secretUnusedRule) evaluatePod(ctx context.Context, pod *corev1.Pod) (a 
 			if vol.Secret != nil && vol.Secret.SecretName == key.Name {
 				a.Violated = false
 				a.Message = fmt.Sprintf("Secret is being used by pod '%s' volume '%s'", pod.Name, vol.Name)
-				s.status.SetViolation(key, a.Violated)
+				s.status.setViolation(key, a.Violated)
 				return
 			}
 		}
@@ -142,7 +132,7 @@ func (s *secretUnusedRule) evaluatePod(ctx context.Context, pod *corev1.Pod) (a 
 				if envFrom.SecretRef != nil && envFrom.SecretRef.Name == key.Name {
 					a.Violated = false
 					a.Message = fmt.Sprintf("Secret is being used by pod '%s' container '%s' env", pod.Name, container.Name)
-					s.status.SetViolation(key, a.Violated)
+					s.status.setViolation(key, a.Violated)
 					return
 				}
 			}
@@ -150,7 +140,7 @@ func (s *secretUnusedRule) evaluatePod(ctx context.Context, pod *corev1.Pod) (a 
 				if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil && env.ValueFrom.SecretKeyRef.Name == key.Name {
 					a.Violated = false
 					a.Message = fmt.Sprintf("Secret is being used by pod '%s' container '%s' env '%s'", pod.Name, container.Name, env.Name)
-					s.status.SetViolation(key, a.Violated)
+					s.status.setViolation(key, a.Violated)
 					return
 				}
 			}
@@ -159,14 +149,14 @@ func (s *secretUnusedRule) evaluatePod(ctx context.Context, pod *corev1.Pod) (a 
 	return
 }
 
-func (s *secretUnusedRule) evaluateSecret(ctx context.Context, secret *corev1.Secret) (a alert.Alert, err error) {
+func (s *SecretUnusedRule) evaluateSecret(ctx context.Context, secret *corev1.Secret) (a alert.Alert, err error) {
 	key := client.ObjectKey{Namespace: secret.Namespace, Name: secret.Name}
 	a = alert.Alert{
 		Suppressed:      s.resource.Spec.Notification.Suppressed,
 		Severity:        s.resource.Spec.Notification.Severity,
 		MessageTemplate: s.resource.Spec.Notification.CustomMessageTemplate,
 		Message:         "secret is not being used",
-		ResourceKind:    merlinv1.GetStructName(secret),
+		ResourceKind:    getStructName(secret),
 		ResourceName:    key.String(),
 		Violated:        true,
 	}
@@ -188,7 +178,7 @@ func (s *secretUnusedRule) evaluateSecret(ctx context.Context, secret *corev1.Se
 			if vol.Secret != nil && vol.Secret.SecretName == secret.Name {
 				a.Violated = false
 				a.Message = fmt.Sprintf("Secret is being used by pod '%s' volume '%s'", pod.Name, vol.Name)
-				s.status.SetViolation(key, a.Violated)
+				s.status.setViolation(key, a.Violated)
 				return
 			}
 		}
@@ -197,7 +187,7 @@ func (s *secretUnusedRule) evaluateSecret(ctx context.Context, secret *corev1.Se
 				if envFrom.SecretRef != nil && envFrom.SecretRef.Name == secret.Name {
 					a.Violated = false
 					a.Message = fmt.Sprintf("Secret is being used by pod '%s' container '%s' env", pod.Name, container.Name)
-					s.status.SetViolation(key, a.Violated)
+					s.status.setViolation(key, a.Violated)
 					return
 				}
 			}
@@ -205,18 +195,18 @@ func (s *secretUnusedRule) evaluateSecret(ctx context.Context, secret *corev1.Se
 				if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil && env.ValueFrom.SecretKeyRef.Name == secret.Name {
 					a.Violated = false
 					a.Message = fmt.Sprintf("Secret is being used by pod '%s' container '%s' env '%s'", pod.Name, container.Name, env.Name)
-					s.status.SetViolation(key, a.Violated)
+					s.status.setViolation(key, a.Violated)
 					return
 				}
 			}
 		}
 	}
-	s.status.SetViolation(key, a.Violated)
+	s.status.setViolation(key, a.Violated)
 	return
 
 }
 
-func (s *secretUnusedRule) GetDelaySeconds(object interface{}) (time.Duration, error) {
+func (s *SecretUnusedRule) GetDelaySeconds(object interface{}) (time.Duration, error) {
 	secret, isSecret := object.(*corev1.Secret)
 	pod, isPod := object.(*corev1.Pod)
 	if isSecret {

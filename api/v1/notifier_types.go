@@ -16,8 +16,6 @@ limitations under the License.
 package v1
 
 import (
-	"fmt"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -28,8 +26,6 @@ import (
 const (
 	Separator = string(types.Separator)
 )
-
-var NotifierNotFoundErr = fmt.Errorf("notifier not found")
 
 // +kubebuilder:object:root=true
 

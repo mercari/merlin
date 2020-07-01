@@ -12,8 +12,6 @@ import (
 type EventHandler struct {
 	// logger
 	Log logr.Logger
-	// Kind is object kind which associated with the event
-	Kind string
 }
 
 const Separator = string(types.Separator)
@@ -45,9 +43,6 @@ func (e *EventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInt
 	} else {
 		e.Log.Error(nil, "UpdateEvent received with no new or old metadata", "event", evt)
 	}
-	if e.Kind != "" {
-		req.Name = e.Kind + Separator + req.Name
-	}
 	q.Add(req)
 	return
 }
@@ -63,9 +58,6 @@ func (e *EventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInt
 		Name:      evt.Meta.GetName(),
 		Namespace: evt.Meta.GetNamespace(),
 	}}
-	if e.Kind != "" {
-		req.Name = e.Kind + Separator + req.Name
-	}
 	q.Add(req)
 }
 
@@ -80,9 +72,6 @@ func (e *EventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInt
 		Name:      evt.Meta.GetName(),
 		Namespace: evt.Meta.GetNamespace(),
 	}}
-	if e.Kind != "" {
-		req.Name = e.Kind + Separator + req.Name
-	}
 	q.Add(req)
 }
 
@@ -97,8 +86,5 @@ func (e *EventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingI
 		Name:      evt.Meta.GetName(),
 		Namespace: evt.Meta.GetNamespace(),
 	}}
-	if e.Kind != "" {
-		req.Name = e.Kind + Separator + req.Name
-	}
 	q.Add(req)
 }

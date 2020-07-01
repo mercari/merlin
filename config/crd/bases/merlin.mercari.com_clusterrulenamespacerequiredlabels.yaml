@@ -15,8 +15,6 @@ spec:
     plural: clusterrulenamespacerequiredlabels
     singular: clusterrulenamespacerequiredlabel
   scope: Cluster
-  subresources:
-    status: {}
   validation:
     openAPIV3Schema:
       description: ClusterRuleNamespaceRequiredLabel is the Schema for the clusterrulenamespacerequiredlabels
@@ -91,15 +89,6 @@ spec:
           required:
           - label
           - notification
-          type: object
-        status:
-          properties:
-            checkedAt:
-              type: string
-            violations:
-              additionalProperties:
-                type: string
-              type: object
           type: object
       type: object
   version: v1

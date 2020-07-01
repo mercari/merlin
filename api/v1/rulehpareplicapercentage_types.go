@@ -16,14 +16,7 @@ limitations under the License.
 package v1
 
 import (
-	"context"
-	"fmt"
-
-	"github.com/go-logr/logr"
-	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // RuleHPAReplicaPercentageSpec defines the desired state of RuleHPAReplicaPercentage
@@ -45,99 +38,14 @@ type RuleHPAReplicaPercentageList struct {
 	Items           []RuleHPAReplicaPercentage `json:"items"`
 }
 
-func (r RuleHPAReplicaPercentageList) ListItems() []Rule {
-	var items []Rule
-	for _, i := range r.Items {
-		items = append(items, &i)
-	}
-	return items
-}
-
 // +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
 
 // RuleHPAReplicaPercentage is the Schema for the rulehpareplicapercentage API
 type RuleHPAReplicaPercentage struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   RuleHPAReplicaPercentageSpec `json:"spec,omitempty"`
-	Status RuleStatus                   `json:"status,omitempty"`
-}
-
-func (r RuleHPAReplicaPercentage) Evaluate(ctx context.Context, cli client.Client, l logr.Logger, object interface{}) (isViolated bool, message string, err error) {
-	hpa, ok := object.(autoscalingv1.HorizontalPodAutoscaler)
-	if !ok {
-		err = fmt.Errorf("unable to convert object to type %T", hpa)
-		return
-	}
-	l.Info("evaluating", GetStructName(hpa), hpa.Name)
-
-	if float64(hpa.Status.CurrentReplicas)/float64(hpa.Spec.MaxReplicas) >= float64(r.Spec.Percent)/100.0 {
-		isViolated = true
-		message = fmt.Sprintf("HPA percentage is >= %v%%", r.Spec.Percent)
-	} else {
-		message = fmt.Sprintf("HPA percentage is within threshold (< %v%%)", r.Spec.Percent)
-	}
-	return
-}
-
-func (r RuleHPAReplicaPercentage) GetStatus() RuleStatus {
-	return r.Status
-}
-
-func (r RuleHPAReplicaPercentage) List() RuleList {
-	return &RuleHPAReplicaPercentageList{}
-}
-
-func (r RuleHPAReplicaPercentage) IsNamespaceIgnored(namespace string) bool {
-	return false
-}
-
-func (r RuleHPAReplicaPercentage) GetNamespacedRuleList() RuleList {
-	return nil
-}
-
-func (r RuleHPAReplicaPercentage) GetNotification() Notification {
-	return r.Spec.Notification
-}
-
-func (r *RuleHPAReplicaPercentage) SetViolationStatus(name types.NamespacedName, isViolated bool) {
-	r.Status.SetViolation(name, isViolated)
-}
-
-func (r RuleHPAReplicaPercentage) GetResourceList() ResourceList {
-	return &autoscalingv1HPAList{}
-}
-
-func (r RuleHPAReplicaPercentage) IsNamespacedRule() bool {
-	return true
-}
-
-func (r RuleHPAReplicaPercentage) GetSelector() *Selector {
-	return &r.Spec.Selector
-}
-
-func (r RuleHPAReplicaPercentage) GetObjectNamespacedName(object interface{}) (namespacedName types.NamespacedName, err error) {
-	hpa, ok := object.(autoscalingv1.HorizontalPodAutoscaler)
-	if !ok {
-		err = fmt.Errorf("unable to convert object to type %T", hpa)
-		return
-	}
-	namespacedName = types.NamespacedName{Namespace: hpa.Namespace, Name: hpa.Name}
-	return
-}
-
-func (r RuleHPAReplicaPercentage) GetObjectMeta() metav1.ObjectMeta {
-	return r.ObjectMeta
-}
-
-func (r *RuleHPAReplicaPercentage) SetFinalizer(finalizer string) {
-	r.ObjectMeta.Finalizers = append(r.ObjectMeta.Finalizers, finalizer)
-}
-
-func (r *RuleHPAReplicaPercentage) RemoveFinalizer(finalizer string) {
-	removeString(r.ObjectMeta.Finalizers, finalizer)
+	Spec RuleHPAReplicaPercentageSpec `json:"spec,omitempty"`
 }
 
 func init() {
