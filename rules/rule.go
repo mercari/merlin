@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -44,11 +45,13 @@ func (r *Status) setViolation(key client.ObjectKey, isViolated bool) {
 	r.checkedAt = &now
 }
 
-func (r *Status) getViolations() map[string]time.Time {
+func (r *Status) getViolations(namespace string) map[string]time.Time {
 	violations := map[string]time.Time{}
 	r.Lock()
 	for k, v := range r.violations {
-		violations[k] = v
+		if strings.Split(k, Separator)[0] == namespace {
+			violations[k] = v
+		}
 	}
 	r.Unlock()
 	return violations

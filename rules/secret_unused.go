@@ -110,14 +110,10 @@ func (s *SecretUnusedRule) evaluatePod(ctx context.Context, pod *corev1.Pod) (a 
 		a.Violated = false
 		return
 	}
-	for secret := range s.status.getViolations() {
+	for secret := range s.status.getViolations(pod.Namespace) {
 		key := client.ObjectKey{
 			Namespace: strings.Split(secret, Separator)[0],
 			Name:      strings.Split(secret, Separator)[1]}
-		if pod.Namespace != key.Namespace {
-			a.Violated = false
-			continue
-		}
 		a.ResourceName = key.String()
 		for _, vol := range pod.Spec.Volumes {
 			if vol.Secret != nil && vol.Secret.SecretName == key.Name {
