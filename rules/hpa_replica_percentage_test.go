@@ -15,12 +15,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kouzoh/merlin/alert"
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 	"github.com/kouzoh/merlin/mocks"
 )
 
 func Test_hpaReplicaPercentageRuleBasic(t *testing.T) {
-	notification := merlinv1.Notification{
+	notification := merlinv1beta1.Notification{
 		Notifiers:  []string{"testNotifier"},
 		Suppressed: true,
 	}
@@ -36,9 +36,9 @@ func Test_hpaReplicaPercentageRuleBasic(t *testing.T) {
 			objectMeta: metav1.ObjectMeta{Name: "test-r"},
 			ruleName:   "ClusterRuleHPAReplicaPercentage/test-r",
 			rule: &hpaReplicaPercentageClusterRule{
-				resource: &merlinv1.ClusterRuleHPAReplicaPercentage{
+				resource: &merlinv1beta1.ClusterRuleHPAReplicaPercentage{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-r"},
-					Spec: merlinv1.ClusterRuleHPAReplicaPercentageSpec{
+					Spec: merlinv1beta1.ClusterRuleHPAReplicaPercentageSpec{
 						Notification: notification,
 					},
 				},
@@ -49,9 +49,9 @@ func Test_hpaReplicaPercentageRuleBasic(t *testing.T) {
 			objectMeta: metav1.ObjectMeta{Name: "test-r"},
 			ruleName:   "RuleHPAReplicaPercentage/test-r",
 			rule: &hpaReplicaPercentageNamespaceRule{
-				resource: &merlinv1.RuleHPAReplicaPercentage{
+				resource: &merlinv1beta1.RuleHPAReplicaPercentage{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-r"},
-					Spec: merlinv1.RuleHPAReplicaPercentageSpec{
+					Spec: merlinv1beta1.RuleHPAReplicaPercentageSpec{
 						Notification: notification,
 					},
 				},
@@ -91,17 +91,17 @@ func Test_HPAReplicaPercentageRule_NewRule(t *testing.T) {
 			key:         client.ObjectKey{Namespace: "", Name: "test-rule"},
 			ruleFactory: &HPAReplicaPercentageRule{},
 			mockCall: func(key client.ObjectKey) runtime.Object {
-				merlinRule := merlinv1.ClusterRuleHPAReplicaPercentage{
+				merlinRule := merlinv1beta1.ClusterRuleHPAReplicaPercentage{
 					ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace, Name: key.Name},
-					Spec: merlinv1.ClusterRuleHPAReplicaPercentageSpec{
-						Notification: merlinv1.Notification{
+					Spec: merlinv1beta1.ClusterRuleHPAReplicaPercentageSpec{
+						Notification: merlinv1beta1.Notification{
 							Notifiers:  []string{"testNotifier"},
 							Suppressed: true,
 						},
 					},
 				}
 				mockClient.EXPECT().
-					Get(ctx, key, &merlinv1.ClusterRuleHPAReplicaPercentage{}).
+					Get(ctx, key, &merlinv1beta1.ClusterRuleHPAReplicaPercentage{}).
 					SetArg(2, merlinRule).
 					Return(nil).
 					Times(1)
@@ -113,17 +113,17 @@ func Test_HPAReplicaPercentageRule_NewRule(t *testing.T) {
 			key:         client.ObjectKey{Namespace: "test-ns", Name: "test-rule"},
 			ruleFactory: &HPAReplicaPercentageRule{},
 			mockCall: func(key client.ObjectKey) runtime.Object {
-				merlinRule := merlinv1.RuleHPAReplicaPercentage{
+				merlinRule := merlinv1beta1.RuleHPAReplicaPercentage{
 					ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace, Name: key.Name},
-					Spec: merlinv1.RuleHPAReplicaPercentageSpec{
-						Notification: merlinv1.Notification{
+					Spec: merlinv1beta1.RuleHPAReplicaPercentageSpec{
+						Notification: merlinv1beta1.Notification{
 							Notifiers:  []string{"testNotifier"},
 							Suppressed: true,
 						},
 					},
 				}
 				mockClient.EXPECT().
-					Get(ctx, key, &merlinv1.RuleHPAReplicaPercentage{}).
+					Get(ctx, key, &merlinv1beta1.RuleHPAReplicaPercentage{}).
 					SetArg(2, merlinRule).
 					Return(nil).
 					Times(1)
@@ -152,7 +152,7 @@ func Test_HPAReplicaPercentageRule_Evaluate(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockClient := mocks.NewMockClient(mockCtrl)
 	ruleFactory := &HPAReplicaPercentageRule{}
-	notification := merlinv1.Notification{Notifiers: []string{"testNotifier"}}
+	notification := merlinv1beta1.Notification{Notifiers: []string{"testNotifier"}}
 	clusterRuleKey := client.ObjectKey{Namespace: "", Name: "clusterRule"}
 	namespaceRuleKey := client.ObjectKey{Namespace: "testNS", Name: "namespaceRule"}
 
@@ -168,7 +168,7 @@ func Test_HPAReplicaPercentageRule_Evaluate(t *testing.T) {
 			desc: "clusterRule - non hpa should return err",
 			key:  clusterRuleKey,
 			mockCalls: []*gomock.Call{
-				mockClient.EXPECT().Get(ctx, clusterRuleKey, &merlinv1.ClusterRuleHPAReplicaPercentage{}).Return(nil),
+				mockClient.EXPECT().Get(ctx, clusterRuleKey, &merlinv1beta1.ClusterRuleHPAReplicaPercentage{}).Return(nil),
 			},
 			resource:  &autoscalingv1.HorizontalPodAutoscalerList{},
 			expectErr: true,
@@ -177,7 +177,7 @@ func Test_HPAReplicaPercentageRule_Evaluate(t *testing.T) {
 			desc: "namespaceRule - non hpa should return err",
 			key:  namespaceRuleKey,
 			mockCalls: []*gomock.Call{
-				mockClient.EXPECT().Get(ctx, namespaceRuleKey, &merlinv1.RuleHPAReplicaPercentage{}).Return(nil),
+				mockClient.EXPECT().Get(ctx, namespaceRuleKey, &merlinv1beta1.RuleHPAReplicaPercentage{}).Return(nil),
 			},
 			resource:  &autoscalingv1.HorizontalPodAutoscalerList{},
 			expectErr: true,
@@ -187,9 +187,9 @@ func Test_HPAReplicaPercentageRule_Evaluate(t *testing.T) {
 			key:  clusterRuleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, clusterRuleKey, &merlinv1.ClusterRuleHPAReplicaPercentage{}).
-					SetArg(2, merlinv1.ClusterRuleHPAReplicaPercentage{
-						Spec: merlinv1.ClusterRuleHPAReplicaPercentageSpec{
+					Get(ctx, clusterRuleKey, &merlinv1beta1.ClusterRuleHPAReplicaPercentage{}).
+					SetArg(2, merlinv1beta1.ClusterRuleHPAReplicaPercentage{
+						Spec: merlinv1beta1.ClusterRuleHPAReplicaPercentageSpec{
 							Notification: notification,
 							Percent:      80,
 						},
@@ -213,9 +213,9 @@ func Test_HPAReplicaPercentageRule_Evaluate(t *testing.T) {
 			key:  clusterRuleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, clusterRuleKey, &merlinv1.ClusterRuleHPAReplicaPercentage{}).
-					SetArg(2, merlinv1.ClusterRuleHPAReplicaPercentage{
-						Spec: merlinv1.ClusterRuleHPAReplicaPercentageSpec{
+					Get(ctx, clusterRuleKey, &merlinv1beta1.ClusterRuleHPAReplicaPercentage{}).
+					SetArg(2, merlinv1beta1.ClusterRuleHPAReplicaPercentage{
+						Spec: merlinv1beta1.ClusterRuleHPAReplicaPercentageSpec{
 							Notification: notification,
 							Percent:      80,
 						},
@@ -239,9 +239,9 @@ func Test_HPAReplicaPercentageRule_Evaluate(t *testing.T) {
 			key:  namespaceRuleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, namespaceRuleKey, &merlinv1.RuleHPAReplicaPercentage{}).
-					SetArg(2, merlinv1.RuleHPAReplicaPercentage{
-						Spec: merlinv1.RuleHPAReplicaPercentageSpec{
+					Get(ctx, namespaceRuleKey, &merlinv1beta1.RuleHPAReplicaPercentage{}).
+					SetArg(2, merlinv1beta1.RuleHPAReplicaPercentage{
+						Spec: merlinv1beta1.RuleHPAReplicaPercentageSpec{
 							Notification: notification,
 							Percent:      80,
 						},
@@ -265,9 +265,9 @@ func Test_HPAReplicaPercentageRule_Evaluate(t *testing.T) {
 			key:  namespaceRuleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, namespaceRuleKey, &merlinv1.RuleHPAReplicaPercentage{}).
-					SetArg(2, merlinv1.RuleHPAReplicaPercentage{
-						Spec: merlinv1.RuleHPAReplicaPercentageSpec{
+					Get(ctx, namespaceRuleKey, &merlinv1beta1.RuleHPAReplicaPercentage{}).
+					SetArg(2, merlinv1beta1.RuleHPAReplicaPercentage{
+						Spec: merlinv1beta1.RuleHPAReplicaPercentageSpec{
 							Notification: notification,
 							Percent:      80,
 						},
@@ -314,7 +314,7 @@ func Test_HPAReplicaPercentageRule_EvaluateAll(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockClient := mocks.NewMockClient(mockCtrl)
 	ruleFactory := &HPAReplicaPercentageRule{}
-	notification := merlinv1.Notification{Notifiers: []string{"testNotifier"}}
+	notification := merlinv1beta1.Notification{Notifiers: []string{"testNotifier"}}
 	clusterRuleKey := client.ObjectKey{Namespace: "", Name: "clusterRule"}
 	namespaceRuleKey := client.ObjectKey{Namespace: "testNS", Name: "namespaceRule"}
 
@@ -330,10 +330,10 @@ func Test_HPAReplicaPercentageRule_EvaluateAll(t *testing.T) {
 			key:  clusterRuleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, clusterRuleKey, &merlinv1.ClusterRuleHPAReplicaPercentage{}).
-					SetArg(2, merlinv1.ClusterRuleHPAReplicaPercentage{
+					Get(ctx, clusterRuleKey, &merlinv1beta1.ClusterRuleHPAReplicaPercentage{}).
+					SetArg(2, merlinv1beta1.ClusterRuleHPAReplicaPercentage{
 						ObjectMeta: metav1.ObjectMeta{Namespace: clusterRuleKey.Namespace, Name: "cRule"},
-						Spec: merlinv1.ClusterRuleHPAReplicaPercentageSpec{
+						Spec: merlinv1beta1.ClusterRuleHPAReplicaPercentageSpec{
 							Notification: notification,
 							Percent:      80,
 						},
@@ -349,10 +349,10 @@ func Test_HPAReplicaPercentageRule_EvaluateAll(t *testing.T) {
 			key:  namespaceRuleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, namespaceRuleKey, &merlinv1.RuleHPAReplicaPercentage{}).
-					SetArg(2, merlinv1.RuleHPAReplicaPercentage{
+					Get(ctx, namespaceRuleKey, &merlinv1beta1.RuleHPAReplicaPercentage{}).
+					SetArg(2, merlinv1beta1.RuleHPAReplicaPercentage{
 						ObjectMeta: metav1.ObjectMeta{Namespace: namespaceRuleKey.Namespace, Name: "nsRule"},
-						Spec: merlinv1.RuleHPAReplicaPercentageSpec{
+						Spec: merlinv1beta1.RuleHPAReplicaPercentageSpec{
 							Notification: notification,
 							Percent:      80,
 						},
@@ -369,9 +369,9 @@ func Test_HPAReplicaPercentageRule_EvaluateAll(t *testing.T) {
 			key:  clusterRuleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, clusterRuleKey, &merlinv1.ClusterRuleHPAReplicaPercentage{}).
-					SetArg(2, merlinv1.ClusterRuleHPAReplicaPercentage{
-						Spec: merlinv1.ClusterRuleHPAReplicaPercentageSpec{
+					Get(ctx, clusterRuleKey, &merlinv1beta1.ClusterRuleHPAReplicaPercentage{}).
+					SetArg(2, merlinv1beta1.ClusterRuleHPAReplicaPercentage{
+						Spec: merlinv1beta1.ClusterRuleHPAReplicaPercentageSpec{
 							Notification: notification,
 							Percent:      80,
 						},
@@ -405,10 +405,10 @@ func Test_HPAReplicaPercentageRule_EvaluateAll(t *testing.T) {
 			key:  namespaceRuleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, namespaceRuleKey, &merlinv1.RuleHPAReplicaPercentage{}).
-					SetArg(2, merlinv1.RuleHPAReplicaPercentage{
+					Get(ctx, namespaceRuleKey, &merlinv1beta1.RuleHPAReplicaPercentage{}).
+					SetArg(2, merlinv1beta1.RuleHPAReplicaPercentage{
 						ObjectMeta: metav1.ObjectMeta{Namespace: namespaceRuleKey.Namespace, Name: "nsRule"},
-						Spec: merlinv1.RuleHPAReplicaPercentageSpec{
+						Spec: merlinv1beta1.RuleHPAReplicaPercentageSpec{
 							Notification: notification,
 							Percent:      80,
 						},

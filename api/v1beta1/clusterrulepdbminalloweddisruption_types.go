@@ -13,40 +13,42 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ClusterRuleHPAInvalidScaleTargetRefSpec defines the desired state of ClusterRuleHPAInvalidScaleTargetRef
-type ClusterRuleHPAInvalidScaleTargetRefSpec struct {
+// ClusterRulePDBMinAllowedDisruptionSpec defines the desired state of ClusterRulePDBMinAllowedDisruption
+type ClusterRulePDBMinAllowedDisruptionSpec struct {
 	// IgnoreNamespaces is the list of namespaces to ignore for this rule
 	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
 	// Notification contains the channels and messages to send out to external system, such as slack or pagerduty.
 	Notification Notification `json:"notification"`
+	// MinAllowedDisruption is the minimal allowed disruption for this rule, should be an integer, default to 1
+	MinAllowedDisruption int `json:"minAllowedDisruption,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// ClusterRuleHPAInvalidScaleTargetRefList contains a list of ClusterRuleHPAInvalidScaleTargetRef
-type ClusterRuleHPAInvalidScaleTargetRefList struct {
+// ClusterRulePDBMinAllowedDisruptionList contains a list of ClusterRulePDBMinAllowedDisruption
+type ClusterRulePDBMinAllowedDisruptionList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ClusterRuleHPAInvalidScaleTargetRef `json:"items"`
+	Items           []ClusterRulePDBMinAllowedDisruption `json:"items"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
 
-// ClusterRuleHPAInvalidScaleTargetRef is the Schema for the cluster rule hpa invalid scale target refs API
-type ClusterRuleHPAInvalidScaleTargetRef struct {
+// ClusterRulePDBMinAllowedDisruption is the Schema for the clusterrulepdbminalloweddisruptions API
+type ClusterRulePDBMinAllowedDisruption struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec ClusterRuleHPAInvalidScaleTargetRefSpec `json:"spec,omitempty"`
+	Spec ClusterRulePDBMinAllowedDisruptionSpec `json:"spec,omitempty"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ClusterRuleHPAInvalidScaleTargetRef{}, &ClusterRuleHPAInvalidScaleTargetRefList{})
+	SchemeBuilder.Register(&ClusterRulePDBMinAllowedDisruption{}, &ClusterRulePDBMinAllowedDisruptionList{})
 }

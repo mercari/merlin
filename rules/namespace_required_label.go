@@ -13,19 +13,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kouzoh/merlin/alert"
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 )
 
 type NamespaceRequiredLabelRule struct {
 	rule
-	resource *merlinv1.ClusterRuleNamespaceRequiredLabel
+	resource *merlinv1beta1.ClusterRuleNamespaceRequiredLabel
 }
 
 func (n *NamespaceRequiredLabelRule) New(ctx context.Context, cli client.Client, logger logr.Logger, key client.ObjectKey) (Rule, error) {
 	n.cli = cli
 	n.log = logger
 	n.status = &Status{}
-	n.resource = &merlinv1.ClusterRuleNamespaceRequiredLabel{}
+	n.resource = &merlinv1beta1.ClusterRuleNamespaceRequiredLabel{}
 	if err := n.cli.Get(ctx, key, n.resource); err != nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func (n NamespaceRequiredLabelRule) GetObjectMeta() metav1.ObjectMeta {
 	return n.resource.ObjectMeta
 }
 
-func (n NamespaceRequiredLabelRule) GetNotification() merlinv1.Notification {
+func (n NamespaceRequiredLabelRule) GetNotification() merlinv1beta1.Notification {
 	return n.resource.Spec.Notification
 }
 

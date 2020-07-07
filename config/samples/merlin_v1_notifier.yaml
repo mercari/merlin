@@ -1,4 +1,4 @@
-apiVersion: merlin.mercari.com/v1
+apiVersion: merlin.mercari.com/v1beta1
 kind: Notifier
 metadata:
   name: slack-test

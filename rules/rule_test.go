@@ -12,7 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 )
 
 func Test_Status(t *testing.T) {
@@ -46,13 +46,13 @@ func Test_Rule(t *testing.T) {
 func Test_Selector(t *testing.T) {
 	cases := []struct {
 		desc        string
-		selector    merlinv1.Selector
+		selector    merlinv1beta1.Selector
 		namespace   string
 		listOptions *client.ListOptions
 	}{
 		{
 			desc:      "Selector with name should set fieldSelector as name in listOptions",
-			selector:  merlinv1.Selector{Name: "test"},
+			selector:  merlinv1beta1.Selector{Name: "test"},
 			namespace: "default",
 			listOptions: &client.ListOptions{
 				Namespace:     "default",
@@ -61,7 +61,7 @@ func Test_Selector(t *testing.T) {
 		},
 		{
 			desc:      "Selector with MatchLabels should set ",
-			selector:  merlinv1.Selector{MatchLabels: map[string]string{"app": "test"}},
+			selector:  merlinv1beta1.Selector{MatchLabels: map[string]string{"app": "test"}},
 			namespace: "default",
 			listOptions: &client.ListOptions{
 				Namespace:     "default",
@@ -70,7 +70,7 @@ func Test_Selector(t *testing.T) {
 		},
 		{
 			desc:      "Selector should respect namespace value given",
-			selector:  merlinv1.Selector{},
+			selector:  merlinv1beta1.Selector{},
 			namespace: "kube-system",
 			listOptions: &client.ListOptions{
 				Namespace: "kube-system",
@@ -78,7 +78,7 @@ func Test_Selector(t *testing.T) {
 		},
 		{
 			desc:      "Selector Name and MatchLabels can co-exist",
-			selector:  merlinv1.Selector{Name: "test", MatchLabels: map[string]string{"app": "test"}},
+			selector:  merlinv1beta1.Selector{Name: "test", MatchLabels: map[string]string{"app": "test"}},
 			namespace: "test",
 			listOptions: &client.ListOptions{
 				Namespace:     "test",
@@ -131,58 +131,58 @@ func Test_getStructName(t *testing.T) {
 func Test_validateRequiredLabel(t *testing.T) {
 	cases := []struct {
 		desc           string
-		requiredLabels merlinv1.RequiredLabel
+		requiredLabels merlinv1beta1.RequiredLabel
 		labels         map[string]string
 		message        string
 		expectErr      bool
 	}{
 		{
 			desc:           "empty labels should get proper message",
-			requiredLabels: merlinv1.RequiredLabel{Key: "test", Value: "test"},
+			requiredLabels: merlinv1beta1.RequiredLabel{Key: "test", Value: "test"},
 			message:        "doenst have required label `test`",
 		},
 		{
 			desc:           "non exists key should get proper message",
-			requiredLabels: merlinv1.RequiredLabel{Key: "test", Value: "test"},
+			requiredLabels: merlinv1beta1.RequiredLabel{Key: "test", Value: "test"},
 			labels:         map[string]string{"blah": "test"},
 			message:        "doenst have required label `test`",
 		},
 		{
 			desc:           "incorrect value should get message without specified match",
-			requiredLabels: merlinv1.RequiredLabel{Key: "test", Value: "test"},
+			requiredLabels: merlinv1beta1.RequiredLabel{Key: "test", Value: "test"},
 			labels:         map[string]string{"test": "blah"},
 			message:        "has incorrect label value `blah` (expect `test`) for label `test`",
 		},
 		{
 			desc:           "correct value should get message without specified match",
-			requiredLabels: merlinv1.RequiredLabel{Key: "test", Value: "test"},
+			requiredLabels: merlinv1beta1.RequiredLabel{Key: "test", Value: "test"},
 			labels:         map[string]string{"test": "test"},
 		},
 		{
 			desc:           "incorrect value should get message with match specified as exact",
-			requiredLabels: merlinv1.RequiredLabel{Key: "test", Value: "test", Match: "exact"},
+			requiredLabels: merlinv1beta1.RequiredLabel{Key: "test", Value: "test", Match: "exact"},
 			labels:         map[string]string{"test": "blah"},
 			message:        "has incorrect label value `blah` (expect `test`) for label `test`",
 		},
 		{
 			desc:           "correct value should get message with match specified as exact",
-			requiredLabels: merlinv1.RequiredLabel{Key: "test", Value: "test", Match: "exact"},
+			requiredLabels: merlinv1beta1.RequiredLabel{Key: "test", Value: "test", Match: "exact"},
 			labels:         map[string]string{"test": "test"},
 		},
 		{
 			desc:           "incorrect value should get message with match specified as regexp",
-			requiredLabels: merlinv1.RequiredLabel{Key: "test", Value: "test", Match: "regexp"},
+			requiredLabels: merlinv1beta1.RequiredLabel{Key: "test", Value: "test", Match: "regexp"},
 			labels:         map[string]string{"test": "blah"},
 			message:        "has incorrect label value `blah` (regex match `test`) for label `test`",
 		},
 		{
 			desc:           "correct value should get message with match specified as regexp",
-			requiredLabels: merlinv1.RequiredLabel{Key: "test", Value: "test", Match: "regexp"},
+			requiredLabels: merlinv1beta1.RequiredLabel{Key: "test", Value: "test", Match: "regexp"},
 			labels:         map[string]string{"test": "test"},
 		},
 		{
 			desc:           "correct value should get message with match specified as regexp",
-			requiredLabels: merlinv1.RequiredLabel{Key: "test", Value: "t[a-z]+", Match: "regexp"},
+			requiredLabels: merlinv1beta1.RequiredLabel{Key: "test", Value: "t[a-z]+", Match: "regexp"},
 			labels:         map[string]string{"test": "test"},
 		},
 	}

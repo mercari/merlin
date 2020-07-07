@@ -18,7 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kouzoh/merlin/alert"
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 )
 
 const Separator = string(types.Separator)
@@ -75,7 +75,7 @@ type Rule interface {
 	// GetObjectMeta returns the GetObjectMeta of the rule
 	GetObjectMeta() metav1.ObjectMeta
 	// GetNotification returns the notifications specified for the rule
-	GetNotification() merlinv1.Notification
+	GetNotification() merlinv1beta1.Notification
 	// EvaluateAll evaluates all applicable resources for the rule, it'll be called by RuleReconciler
 	EvaluateAll(context.Context) ([]alert.Alert, error)
 	// Evaluate evaluates single resource, it'll be called by ResourceReconciler
@@ -174,7 +174,7 @@ func getStructName(v interface{}) string {
 	}
 }
 
-func validateRequiredLabel(r merlinv1.RequiredLabel, labels map[string]string) (message string, err error) {
+func validateRequiredLabel(r merlinv1beta1.RequiredLabel, labels map[string]string) (message string, err error) {
 	v, ok := labels[r.Key]
 	if !ok {
 		return fmt.Sprintf("doenst have required label `%s`", r.Key), nil
@@ -195,7 +195,7 @@ func validateRequiredLabel(r merlinv1.RequiredLabel, labels map[string]string) (
 	}
 	return
 }
-func getListOptions(s merlinv1.Selector, namespace string) (opts *client.ListOptions) {
+func getListOptions(s merlinv1beta1.Selector, namespace string) (opts *client.ListOptions) {
 	opts = &client.ListOptions{Namespace: namespace}
 	if s.Name != "" {
 		opts.FieldSelector = fields.Set{".metadata.name": s.Name}.AsSelector()

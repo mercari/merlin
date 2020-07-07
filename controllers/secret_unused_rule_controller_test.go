@@ -16,26 +16,26 @@ import (
 	// +kubebuilder:scaffold:imports
 
 	"github.com/kouzoh/merlin/alert"
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 	"github.com/kouzoh/merlin/notifiers"
 )
 
 var _ = Describe("SecretUnusedRuleControllerTests", func() {
 	var ctx = context.Background()
 	Context("TestClusterRuleSecretUnused", func() {
-		var ruleStructName = GetStructName(merlinv1.ClusterRuleSecretUnused{})
+		var ruleStructName = GetStructName(merlinv1beta1.ClusterRuleSecretUnused{})
 		var isNotifierCreated = false
-		var notifier = &merlinv1.Notifier{
+		var notifier = &merlinv1beta1.Notifier{
 			ObjectMeta: metav1.ObjectMeta{Name: strings.ToLower(ruleStructName) + "-notifier"},
-			Spec:       merlinv1.NotifierSpec{NotifyInterval: 1},
+			Spec:       merlinv1beta1.NotifierSpec{NotifyInterval: 1},
 		}
-		rule := &merlinv1.ClusterRuleSecretUnused{
+		rule := &merlinv1beta1.ClusterRuleSecretUnused{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "cluster-rule-secret-unused",
 			},
-			Spec: merlinv1.ClusterRuleSecretUnusedSpec{
+			Spec: merlinv1beta1.ClusterRuleSecretUnusedSpec{
 				IgnoreNamespaces: []string{},
-				Notification: merlinv1.Notification{
+				Notification: merlinv1beta1.Notification{
 					Notifiers: []string{notifier.Name},
 				},
 				InitialDelaySeconds: 2,
@@ -64,13 +64,13 @@ var _ = Describe("SecretUnusedRuleControllerTests", func() {
 		})
 
 		It("TestApplyEmptyClusterRule", func() {
-			err := k8sClient.Create(ctx, &merlinv1.ClusterRuleSecretUnused{})
+			err := k8sClient.Create(ctx, &merlinv1beta1.ClusterRuleSecretUnused{})
 			Expect(err).To(HaveOccurred())
 			s, ok := err.(interface{}).(*errors.StatusError)
 			Expect(ok).To(Equal(true))
 			Expect(s.ErrStatus.Code).To(Equal(int32(422)))
-			Expect(s.ErrStatus.Details.Group).To(Equal(merlinv1.GROUP))
-			Expect(s.ErrStatus.Kind).To(Equal(merlinv1.ClusterRuleSecretUnused{}.Kind))
+			Expect(s.ErrStatus.Details.Group).To(Equal(merlinv1beta1.GROUP))
+			Expect(s.ErrStatus.Kind).To(Equal(merlinv1beta1.ClusterRuleSecretUnused{}.Kind))
 			Expect(s.ErrStatus.Details.Causes[0].Type).To(Equal(metav1.CauseTypeFieldValueRequired))
 			Expect(s.ErrStatus.Details.Causes[1].Type).To(Equal(metav1.CauseTypeFieldValueInvalid))
 		})
@@ -82,7 +82,7 @@ var _ = Describe("SecretUnusedRuleControllerTests", func() {
 		It("TestCreateViolatedObjectShouldGetViolations", func() {
 			Expect(k8sClient.Create(ctx, secret)).Should(Succeed())
 			Eventually(func() map[string]alert.Alert {
-				n := &merlinv1.Notifier{}
+				n := &merlinv1beta1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).Should(HaveKey(alertKey))
@@ -109,7 +109,7 @@ var _ = Describe("SecretUnusedRuleControllerTests", func() {
 				}}
 			Expect(k8sClient.Create(ctx, pod)).Should(Succeed())
 			Eventually(func() map[string]alert.Alert {
-				n := &merlinv1.Notifier{}
+				n := &merlinv1beta1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).ShouldNot(HaveKey(alertKey))

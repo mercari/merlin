@@ -18,7 +18,7 @@ import (
 
 	"github.com/kouzoh/merlin/alert"
 	"github.com/kouzoh/merlin/alert/slack"
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 	"github.com/kouzoh/merlin/notifiers"
 )
 
@@ -48,9 +48,9 @@ var _ = Describe("NotifierControllerTests", func() {
 	})
 	var ts = httptest.NewServer(m)
 
-	var testNotifier = &merlinv1.Notifier{
+	var testNotifier = &merlinv1beta1.Notifier{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-notifier"},
-		Spec: merlinv1.NotifierSpec{
+		Spec: merlinv1beta1.NotifierSpec{
 			NotifyInterval: 1,
 			Slack: slack.Spec{
 				WebhookURL: ts.URL,
@@ -60,13 +60,13 @@ var _ = Describe("NotifierControllerTests", func() {
 	}
 
 	It("TestApplyEmptyNotifier", func() {
-		err := k8sClient.Create(ctx, &merlinv1.Notifier{})
+		err := k8sClient.Create(ctx, &merlinv1beta1.Notifier{})
 		Expect(err).To(HaveOccurred())
 		s, ok := err.(interface{}).(*errors.StatusError)
 		Expect(ok).To(Equal(true))
 		Expect(s.ErrStatus.Code).To(Equal(int32(422)))
-		Expect(s.ErrStatus.Details.Group).To(Equal(merlinv1.GROUP))
-		Expect(s.ErrStatus.Kind).To(Equal(merlinv1.Notifier{}.Kind))
+		Expect(s.ErrStatus.Details.Group).To(Equal(merlinv1beta1.GROUP))
+		Expect(s.ErrStatus.Kind).To(Equal(merlinv1beta1.Notifier{}.Kind))
 		Expect(s.ErrStatus.Details.Causes[0].Type).To(Equal(metav1.CauseTypeFieldValueRequired))
 	})
 
@@ -96,7 +96,7 @@ var _ = Describe("NotifierControllerTests", func() {
 
 		By("Notifier status should be updated to k8s")
 		Eventually(func() alert.Alert {
-			n := &merlinv1.Notifier{}
+			n := &merlinv1beta1.Notifier{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: testNotifier.Name}, n)).Should(Succeed())
 			return n.Status.Alerts[alertKey]
 		}, time.Second*3, time.Millisecond*200).Should(Equal(alert.Alert{
@@ -141,7 +141,7 @@ var _ = Describe("NotifierControllerTests", func() {
 
 		By("Notifier status should be updated to k8s")
 		Eventually(func() map[string]alert.Alert {
-			n := &merlinv1.Notifier{}
+			n := &merlinv1beta1.Notifier{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: testNotifier.Name}, n)).Should(Succeed())
 			return n.Status.Alerts
 		}, time.Second*3, time.Millisecond*200).ShouldNot(HaveKey(alertKey))

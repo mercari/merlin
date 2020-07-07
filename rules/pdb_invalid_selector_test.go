@@ -16,26 +16,26 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kouzoh/merlin/alert"
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 	"github.com/kouzoh/merlin/mocks"
 )
 
 func Test_PDBInvalidSelectorRule_Basic(t *testing.T) {
-	notification := merlinv1.Notification{
+	notification := merlinv1beta1.Notification{
 		Notifiers:  []string{"testNotifier"},
 		Suppressed: true,
 	}
 
-	merlinv1Rule := &merlinv1.ClusterRulePDBInvalidSelector{
+	merlinv1beta1Rule := &merlinv1beta1.ClusterRulePDBInvalidSelector{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-r"},
-		Spec: merlinv1.ClusterRulePDBInvalidSelectorSpec{
+		Spec: merlinv1beta1.ClusterRulePDBInvalidSelectorSpec{
 			Notification: notification,
 		},
 	}
 
-	r := &PDBInvalidSelectorRule{resource: merlinv1Rule}
-	assert.Equal(t, merlinv1Rule.ObjectMeta, r.GetObjectMeta())
-	assert.Equal(t, merlinv1Rule, r.GetObject())
+	r := &PDBInvalidSelectorRule{resource: merlinv1beta1Rule}
+	assert.Equal(t, merlinv1beta1Rule.ObjectMeta, r.GetObjectMeta())
+	assert.Equal(t, merlinv1beta1Rule, r.GetObject())
 	assert.Equal(t, notification, r.GetNotification())
 	assert.Equal(t, "ClusterRulePDBInvalidSelector/test-r", r.GetName())
 
@@ -56,7 +56,7 @@ func Test_PDBInvalidSelectorRule_Evaluate(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockClient := mocks.NewMockClient(mockCtrl)
 	ruleFactory := &PDBInvalidSelectorRule{}
-	notification := merlinv1.Notification{Notifiers: []string{"testNotifier"}}
+	notification := merlinv1beta1.Notification{Notifiers: []string{"testNotifier"}}
 	ruleKey := client.ObjectKey{Namespace: "", Name: "rule"}
 
 	cases := []struct {
@@ -72,7 +72,7 @@ func Test_PDBInvalidSelectorRule_Evaluate(t *testing.T) {
 			key:  ruleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, ruleKey, &merlinv1.ClusterRulePDBInvalidSelector{}).
+					Get(ctx, ruleKey, &merlinv1beta1.ClusterRulePDBInvalidSelector{}).
 					Return(nil),
 			},
 			resource:  "non-pdb",
@@ -83,9 +83,9 @@ func Test_PDBInvalidSelectorRule_Evaluate(t *testing.T) {
 			key:  ruleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, ruleKey, &merlinv1.ClusterRulePDBInvalidSelector{}).
-					SetArg(2, merlinv1.ClusterRulePDBInvalidSelector{
-						Spec: merlinv1.ClusterRulePDBInvalidSelectorSpec{
+					Get(ctx, ruleKey, &merlinv1beta1.ClusterRulePDBInvalidSelector{}).
+					SetArg(2, merlinv1beta1.ClusterRulePDBInvalidSelector{
+						Spec: merlinv1beta1.ClusterRulePDBInvalidSelectorSpec{
 							Notification:     notification,
 							IgnoreNamespaces: []string{"ignoredNS"},
 						},
@@ -106,9 +106,9 @@ func Test_PDBInvalidSelectorRule_Evaluate(t *testing.T) {
 			key:  ruleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, ruleKey, &merlinv1.ClusterRulePDBInvalidSelector{}).
-					SetArg(2, merlinv1.ClusterRulePDBInvalidSelector{
-						Spec: merlinv1.ClusterRulePDBInvalidSelectorSpec{
+					Get(ctx, ruleKey, &merlinv1beta1.ClusterRulePDBInvalidSelector{}).
+					SetArg(2, merlinv1beta1.ClusterRulePDBInvalidSelector{
+						Spec: merlinv1beta1.ClusterRulePDBInvalidSelectorSpec{
 							Notification: notification,
 						},
 					}).
@@ -142,9 +142,9 @@ func Test_PDBInvalidSelectorRule_Evaluate(t *testing.T) {
 			key:  ruleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, ruleKey, &merlinv1.ClusterRulePDBInvalidSelector{}).
-					SetArg(2, merlinv1.ClusterRulePDBInvalidSelector{
-						Spec: merlinv1.ClusterRulePDBInvalidSelectorSpec{
+					Get(ctx, ruleKey, &merlinv1beta1.ClusterRulePDBInvalidSelector{}).
+					SetArg(2, merlinv1beta1.ClusterRulePDBInvalidSelector{
+						Spec: merlinv1beta1.ClusterRulePDBInvalidSelectorSpec{
 							Notification: notification,
 						},
 					}).
@@ -201,11 +201,11 @@ func Test_PDBInvalidSelectorRule_EvaluateAll(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	mockClient := mocks.NewMockClient(mockCtrl)
-	notification := merlinv1.Notification{Notifiers: []string{"testNotifier"}}
+	notification := merlinv1beta1.Notification{Notifiers: []string{"testNotifier"}}
 	r := &PDBInvalidSelectorRule{
 		rule: rule{cli: mockClient, log: log, status: &Status{}},
-		resource: &merlinv1.ClusterRulePDBInvalidSelector{
-			Spec: merlinv1.ClusterRulePDBInvalidSelectorSpec{
+		resource: &merlinv1beta1.ClusterRulePDBInvalidSelector{
+			Spec: merlinv1beta1.ClusterRulePDBInvalidSelectorSpec{
 				Notification: notification,
 			},
 		},

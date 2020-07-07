@@ -13,42 +13,41 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ClusterRuleHPAReplicaPercentageSpec defines the desired state of ClusterRuleHPAReplicaPercentageSpec
-type ClusterRuleHPAReplicaPercentageSpec struct {
-	// IgnoreNamespaces is the list of namespaces to ignore for this rule
-	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
+// RuleHPAReplicaPercentageSpec defines the desired state of RuleHPAReplicaPercentage
+type RuleHPAReplicaPercentageSpec struct {
 	// Notification contains the channels and messages to send out to external system, such as slack or pagerduty.
 	Notification Notification `json:"notification"`
+	// Selector selects name or matched labels for a resource to apply this rule
+	Selector Selector `json:"selector"`
 	// Percent is the threshold of percentage for a HPA current replica divided by max replica to be considered as an issue.
 	Percent int32 `json:"percent"`
 }
 
 // +kubebuilder:object:root=true
 
-// ClusterRuleHPAReplicaPercentageList contains a list of ClusterRuleHPAReplicaPercentage
-type ClusterRuleHPAReplicaPercentageList struct {
+// RuleHPAReplicaPercentageList contains a list of RuleHPAReplicaPercentage
+type RuleHPAReplicaPercentageList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ClusterRuleHPAReplicaPercentage `json:"items"`
+	Items           []RuleHPAReplicaPercentage `json:"items"`
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:scope=Cluster
 
-// ClusterRuleHPAReplicaPercentage is the Schema for the cluster rule hpa replica percentages API
-type ClusterRuleHPAReplicaPercentage struct {
+// RuleHPAReplicaPercentage is the Schema for the rulehpareplicapercentage API
+type RuleHPAReplicaPercentage struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec ClusterRuleHPAReplicaPercentageSpec `json:"spec,omitempty"`
+	Spec RuleHPAReplicaPercentageSpec `json:"spec,omitempty"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ClusterRuleHPAReplicaPercentage{}, &ClusterRuleHPAReplicaPercentageList{})
+	SchemeBuilder.Register(&RuleHPAReplicaPercentage{}, &RuleHPAReplicaPercentageList{})
 }

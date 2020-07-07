@@ -18,12 +18,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kouzoh/merlin/alert"
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 	"github.com/kouzoh/merlin/mocks"
 )
 
 func Test_PDBMinAllowedDisruptionRule_Basic(t *testing.T) {
-	notification := merlinv1.Notification{
+	notification := merlinv1beta1.Notification{
 		Notifiers:  []string{"testNotifier"},
 		Suppressed: true,
 	}
@@ -39,9 +39,9 @@ func Test_PDBMinAllowedDisruptionRule_Basic(t *testing.T) {
 			objectMeta: metav1.ObjectMeta{Name: "test-r"},
 			ruleName:   "ClusterRulePDBMinAllowedDisruption/test-r",
 			rule: &pdbMinAllowedDisruptionClusterRule{
-				resource: &merlinv1.ClusterRulePDBMinAllowedDisruption{
+				resource: &merlinv1beta1.ClusterRulePDBMinAllowedDisruption{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-r"},
-					Spec: merlinv1.ClusterRulePDBMinAllowedDisruptionSpec{
+					Spec: merlinv1beta1.ClusterRulePDBMinAllowedDisruptionSpec{
 						Notification: notification,
 					},
 				},
@@ -52,9 +52,9 @@ func Test_PDBMinAllowedDisruptionRule_Basic(t *testing.T) {
 			objectMeta: metav1.ObjectMeta{Name: "test-r"},
 			ruleName:   "RulePDBMinAllowedDisruption/test-r",
 			rule: &pdbMinAllowedDisruptionNamespaceRule{
-				resource: &merlinv1.RulePDBMinAllowedDisruption{
+				resource: &merlinv1beta1.RulePDBMinAllowedDisruption{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-r"},
-					Spec: merlinv1.RulePDBMinAllowedDisruptionSpec{
+					Spec: merlinv1beta1.RulePDBMinAllowedDisruptionSpec{
 						Notification: notification,
 					},
 				},
@@ -94,17 +94,17 @@ func Test_PDBMinAllowedDisruptionRule_NewRule(t *testing.T) {
 			key:         client.ObjectKey{Namespace: "", Name: "test-rule"},
 			ruleFactory: &PDBMinAllowedDisruptionRule{},
 			mockCall: func(key client.ObjectKey) runtime.Object {
-				merlinRule := merlinv1.ClusterRulePDBMinAllowedDisruption{
+				merlinRule := merlinv1beta1.ClusterRulePDBMinAllowedDisruption{
 					ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace, Name: key.Name},
-					Spec: merlinv1.ClusterRulePDBMinAllowedDisruptionSpec{
-						Notification: merlinv1.Notification{
+					Spec: merlinv1beta1.ClusterRulePDBMinAllowedDisruptionSpec{
+						Notification: merlinv1beta1.Notification{
 							Notifiers:  []string{"testNotifier"},
 							Suppressed: true,
 						},
 					},
 				}
 				mockClient.EXPECT().
-					Get(ctx, key, &merlinv1.ClusterRulePDBMinAllowedDisruption{}).
+					Get(ctx, key, &merlinv1beta1.ClusterRulePDBMinAllowedDisruption{}).
 					SetArg(2, merlinRule).
 					Return(nil).
 					Times(1)
@@ -116,17 +116,17 @@ func Test_PDBMinAllowedDisruptionRule_NewRule(t *testing.T) {
 			key:         client.ObjectKey{Namespace: "test-ns", Name: "test-rule"},
 			ruleFactory: &PDBMinAllowedDisruptionRule{},
 			mockCall: func(key client.ObjectKey) runtime.Object {
-				merlinRule := merlinv1.RulePDBMinAllowedDisruption{
+				merlinRule := merlinv1beta1.RulePDBMinAllowedDisruption{
 					ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace, Name: key.Name},
-					Spec: merlinv1.RulePDBMinAllowedDisruptionSpec{
-						Notification: merlinv1.Notification{
+					Spec: merlinv1beta1.RulePDBMinAllowedDisruptionSpec{
+						Notification: merlinv1beta1.Notification{
 							Notifiers:  []string{"testNotifier"},
 							Suppressed: true,
 						},
 					},
 				}
 				mockClient.EXPECT().
-					Get(ctx, key, &merlinv1.RulePDBMinAllowedDisruption{}).
+					Get(ctx, key, &merlinv1beta1.RulePDBMinAllowedDisruption{}).
 					SetArg(2, merlinRule).
 					Return(nil).
 					Times(1)
@@ -155,7 +155,7 @@ func Test_PDBMinAllowedDisruptionRule_Evaluate(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockClient := mocks.NewMockClient(mockCtrl)
 	ruleFactory := &PDBMinAllowedDisruptionRule{}
-	notification := merlinv1.Notification{Notifiers: []string{"testNotifier"}}
+	notification := merlinv1beta1.Notification{Notifiers: []string{"testNotifier"}}
 	clusterRuleKey := client.ObjectKey{Namespace: "", Name: "clusterRule"}
 	namespaceRuleKey := client.ObjectKey{Namespace: "testNS", Name: "namespaceRule"}
 
@@ -171,7 +171,7 @@ func Test_PDBMinAllowedDisruptionRule_Evaluate(t *testing.T) {
 			desc: "clusterRule - non pdb should return err",
 			key:  clusterRuleKey,
 			mockCalls: []*gomock.Call{
-				mockClient.EXPECT().Get(ctx, clusterRuleKey, &merlinv1.ClusterRulePDBMinAllowedDisruption{}).Return(nil),
+				mockClient.EXPECT().Get(ctx, clusterRuleKey, &merlinv1beta1.ClusterRulePDBMinAllowedDisruption{}).Return(nil),
 			},
 			resource:  "non-pdb",
 			expectErr: true,
@@ -181,7 +181,7 @@ func Test_PDBMinAllowedDisruptionRule_Evaluate(t *testing.T) {
 			key:  namespaceRuleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, namespaceRuleKey, &merlinv1.RulePDBMinAllowedDisruption{}).
+					Get(ctx, namespaceRuleKey, &merlinv1beta1.RulePDBMinAllowedDisruption{}).
 					Return(nil),
 			},
 			resource:  "non-pdb",
@@ -192,9 +192,9 @@ func Test_PDBMinAllowedDisruptionRule_Evaluate(t *testing.T) {
 			key:  clusterRuleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, clusterRuleKey, &merlinv1.ClusterRulePDBMinAllowedDisruption{}).
-					SetArg(2, merlinv1.ClusterRulePDBMinAllowedDisruption{
-						Spec: merlinv1.ClusterRulePDBMinAllowedDisruptionSpec{
+					Get(ctx, clusterRuleKey, &merlinv1beta1.ClusterRulePDBMinAllowedDisruption{}).
+					SetArg(2, merlinv1beta1.ClusterRulePDBMinAllowedDisruption{
+						Spec: merlinv1beta1.ClusterRulePDBMinAllowedDisruptionSpec{
 							IgnoreNamespaces: []string{"ignoredNS"},
 							Notification:     notification,
 						},
@@ -216,9 +216,9 @@ func Test_PDBMinAllowedDisruptionRule_Evaluate(t *testing.T) {
 			key:  clusterRuleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, clusterRuleKey, &merlinv1.ClusterRulePDBMinAllowedDisruption{}).
-					SetArg(2, merlinv1.ClusterRulePDBMinAllowedDisruption{
-						Spec: merlinv1.ClusterRulePDBMinAllowedDisruptionSpec{
+					Get(ctx, clusterRuleKey, &merlinv1beta1.ClusterRulePDBMinAllowedDisruption{}).
+					SetArg(2, merlinv1beta1.ClusterRulePDBMinAllowedDisruption{
+						Spec: merlinv1beta1.ClusterRulePDBMinAllowedDisruptionSpec{
 							Notification:         notification,
 							MinAllowedDisruption: 2,
 						},
@@ -255,9 +255,9 @@ func Test_PDBMinAllowedDisruptionRule_Evaluate(t *testing.T) {
 			key:  namespaceRuleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, namespaceRuleKey, &merlinv1.RulePDBMinAllowedDisruption{}).
-					SetArg(2, merlinv1.RulePDBMinAllowedDisruption{
-						Spec: merlinv1.RulePDBMinAllowedDisruptionSpec{
+					Get(ctx, namespaceRuleKey, &merlinv1beta1.RulePDBMinAllowedDisruption{}).
+					SetArg(2, merlinv1beta1.RulePDBMinAllowedDisruption{
+						Spec: merlinv1beta1.RulePDBMinAllowedDisruptionSpec{
 							Notification:         notification,
 							MinAllowedDisruption: 2,
 						},
@@ -294,9 +294,9 @@ func Test_PDBMinAllowedDisruptionRule_Evaluate(t *testing.T) {
 			key:  clusterRuleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, clusterRuleKey, &merlinv1.ClusterRulePDBMinAllowedDisruption{}).
-					SetArg(2, merlinv1.ClusterRulePDBMinAllowedDisruption{
-						Spec: merlinv1.ClusterRulePDBMinAllowedDisruptionSpec{
+					Get(ctx, clusterRuleKey, &merlinv1beta1.ClusterRulePDBMinAllowedDisruption{}).
+					SetArg(2, merlinv1beta1.ClusterRulePDBMinAllowedDisruption{
+						Spec: merlinv1beta1.ClusterRulePDBMinAllowedDisruptionSpec{
 							Notification: notification,
 						},
 					}).
@@ -332,9 +332,9 @@ func Test_PDBMinAllowedDisruptionRule_Evaluate(t *testing.T) {
 			key:  namespaceRuleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, namespaceRuleKey, &merlinv1.RulePDBMinAllowedDisruption{}).
-					SetArg(2, merlinv1.RulePDBMinAllowedDisruption{
-						Spec: merlinv1.RulePDBMinAllowedDisruptionSpec{
+					Get(ctx, namespaceRuleKey, &merlinv1beta1.RulePDBMinAllowedDisruption{}).
+					SetArg(2, merlinv1beta1.RulePDBMinAllowedDisruption{
+						Spec: merlinv1beta1.RulePDBMinAllowedDisruptionSpec{
 							Notification: notification,
 						},
 					}).
@@ -370,9 +370,9 @@ func Test_PDBMinAllowedDisruptionRule_Evaluate(t *testing.T) {
 			key:  clusterRuleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, clusterRuleKey, &merlinv1.ClusterRulePDBMinAllowedDisruption{}).
-					SetArg(2, merlinv1.ClusterRulePDBMinAllowedDisruption{
-						Spec: merlinv1.ClusterRulePDBMinAllowedDisruptionSpec{
+					Get(ctx, clusterRuleKey, &merlinv1beta1.ClusterRulePDBMinAllowedDisruption{}).
+					SetArg(2, merlinv1beta1.ClusterRulePDBMinAllowedDisruption{
+						Spec: merlinv1beta1.ClusterRulePDBMinAllowedDisruptionSpec{
 							Notification: notification,
 						},
 					}).
@@ -408,9 +408,9 @@ func Test_PDBMinAllowedDisruptionRule_Evaluate(t *testing.T) {
 			key:  namespaceRuleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, namespaceRuleKey, &merlinv1.RulePDBMinAllowedDisruption{}).
-					SetArg(2, merlinv1.RulePDBMinAllowedDisruption{
-						Spec: merlinv1.RulePDBMinAllowedDisruptionSpec{
+					Get(ctx, namespaceRuleKey, &merlinv1beta1.RulePDBMinAllowedDisruption{}).
+					SetArg(2, merlinv1beta1.RulePDBMinAllowedDisruption{
+						Spec: merlinv1beta1.RulePDBMinAllowedDisruptionSpec{
 							Notification: notification,
 						},
 					}).
@@ -469,7 +469,7 @@ func Test_PDBMinAllowedDisruptionRule_EvaluateAll(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockClient := mocks.NewMockClient(mockCtrl)
 	ruleFactory := &PDBMinAllowedDisruptionRule{}
-	notification := merlinv1.Notification{Notifiers: []string{"testNotifier"}}
+	notification := merlinv1beta1.Notification{Notifiers: []string{"testNotifier"}}
 	clusterRuleKey := client.ObjectKey{Namespace: "", Name: "clusterRule"}
 	namespaceRuleKey := client.ObjectKey{Namespace: "testNS", Name: "namespaceRule"}
 
@@ -485,10 +485,10 @@ func Test_PDBMinAllowedDisruptionRule_EvaluateAll(t *testing.T) {
 			key:  clusterRuleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, clusterRuleKey, &merlinv1.ClusterRulePDBMinAllowedDisruption{}).
-					SetArg(2, merlinv1.ClusterRulePDBMinAllowedDisruption{
+					Get(ctx, clusterRuleKey, &merlinv1beta1.ClusterRulePDBMinAllowedDisruption{}).
+					SetArg(2, merlinv1beta1.ClusterRulePDBMinAllowedDisruption{
 						ObjectMeta: metav1.ObjectMeta{Namespace: clusterRuleKey.Namespace, Name: "cRule"},
-						Spec: merlinv1.ClusterRulePDBMinAllowedDisruptionSpec{
+						Spec: merlinv1beta1.ClusterRulePDBMinAllowedDisruptionSpec{
 							Notification: notification,
 						},
 					}).
@@ -503,10 +503,10 @@ func Test_PDBMinAllowedDisruptionRule_EvaluateAll(t *testing.T) {
 			key:  namespaceRuleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, namespaceRuleKey, &merlinv1.RulePDBMinAllowedDisruption{}).
-					SetArg(2, merlinv1.RulePDBMinAllowedDisruption{
+					Get(ctx, namespaceRuleKey, &merlinv1beta1.RulePDBMinAllowedDisruption{}).
+					SetArg(2, merlinv1beta1.RulePDBMinAllowedDisruption{
 						ObjectMeta: metav1.ObjectMeta{Namespace: namespaceRuleKey.Namespace, Name: "nsRule"},
-						Spec: merlinv1.RulePDBMinAllowedDisruptionSpec{
+						Spec: merlinv1beta1.RulePDBMinAllowedDisruptionSpec{
 							Notification: notification,
 						},
 					}).
@@ -522,9 +522,9 @@ func Test_PDBMinAllowedDisruptionRule_EvaluateAll(t *testing.T) {
 			key:  clusterRuleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, clusterRuleKey, &merlinv1.ClusterRulePDBMinAllowedDisruption{}).
-					SetArg(2, merlinv1.ClusterRulePDBMinAllowedDisruption{
-						Spec: merlinv1.ClusterRulePDBMinAllowedDisruptionSpec{
+					Get(ctx, clusterRuleKey, &merlinv1beta1.ClusterRulePDBMinAllowedDisruption{}).
+					SetArg(2, merlinv1beta1.ClusterRulePDBMinAllowedDisruption{
+						Spec: merlinv1beta1.ClusterRulePDBMinAllowedDisruptionSpec{
 							Notification: notification,
 						},
 					}).
@@ -595,10 +595,10 @@ func Test_PDBMinAllowedDisruptionRule_EvaluateAll(t *testing.T) {
 			key:  namespaceRuleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, namespaceRuleKey, &merlinv1.RulePDBMinAllowedDisruption{}).
-					SetArg(2, merlinv1.RulePDBMinAllowedDisruption{
+					Get(ctx, namespaceRuleKey, &merlinv1beta1.RulePDBMinAllowedDisruption{}).
+					SetArg(2, merlinv1beta1.RulePDBMinAllowedDisruption{
 						ObjectMeta: metav1.ObjectMeta{Namespace: namespaceRuleKey.Namespace, Name: "nsRule"},
-						Spec: merlinv1.RulePDBMinAllowedDisruptionSpec{
+						Spec: merlinv1beta1.RulePDBMinAllowedDisruptionSpec{
 							Notification: notification,
 						},
 					}).

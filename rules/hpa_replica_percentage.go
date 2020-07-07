@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kouzoh/merlin/alert"
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 )
 
 type HPAReplicaPercentageRule struct{}
@@ -21,7 +21,7 @@ type HPAReplicaPercentageRule struct{}
 func (h *HPAReplicaPercentageRule) New(ctx context.Context, cli client.Client, logger logr.Logger, key client.ObjectKey) (Rule, error) {
 	var r Rule
 	if key.Namespace == "" {
-		resource := &merlinv1.ClusterRuleHPAReplicaPercentage{}
+		resource := &merlinv1beta1.ClusterRuleHPAReplicaPercentage{}
 		if err := cli.Get(ctx, key, resource); err != nil {
 			return nil, err
 		}
@@ -30,7 +30,7 @@ func (h *HPAReplicaPercentageRule) New(ctx context.Context, cli client.Client, l
 			rule:     rule{cli: cli, log: logger, status: &Status{}},
 		}
 	} else {
-		resource := &merlinv1.RuleHPAReplicaPercentage{}
+		resource := &merlinv1beta1.RuleHPAReplicaPercentage{}
 		if err := cli.Get(ctx, key, resource); err != nil {
 			return nil, err
 		}
@@ -44,7 +44,7 @@ func (h *HPAReplicaPercentageRule) New(ctx context.Context, cli client.Client, l
 
 type hpaReplicaPercentageClusterRule struct {
 	rule
-	resource *merlinv1.ClusterRuleHPAReplicaPercentage
+	resource *merlinv1beta1.ClusterRuleHPAReplicaPercentage
 }
 
 func (h *hpaReplicaPercentageClusterRule) GetObject() runtime.Object {
@@ -59,7 +59,7 @@ func (h hpaReplicaPercentageClusterRule) GetObjectMeta() metav1.ObjectMeta {
 	return h.resource.ObjectMeta
 }
 
-func (h hpaReplicaPercentageClusterRule) GetNotification() merlinv1.Notification {
+func (h hpaReplicaPercentageClusterRule) GetNotification() merlinv1beta1.Notification {
 	return h.resource.Spec.Notification
 }
 
@@ -129,7 +129,7 @@ func (h *hpaReplicaPercentageClusterRule) GetDelaySeconds(object interface{}) (t
 
 type hpaReplicaPercentageNamespaceRule struct {
 	rule
-	resource *merlinv1.RuleHPAReplicaPercentage
+	resource *merlinv1beta1.RuleHPAReplicaPercentage
 }
 
 func (h *hpaReplicaPercentageNamespaceRule) GetObject() runtime.Object {
@@ -144,7 +144,7 @@ func (h hpaReplicaPercentageNamespaceRule) GetObjectMeta() metav1.ObjectMeta {
 	return h.resource.ObjectMeta
 }
 
-func (h hpaReplicaPercentageNamespaceRule) GetNotification() merlinv1.Notification {
+func (h hpaReplicaPercentageNamespaceRule) GetNotification() merlinv1beta1.Notification {
 	return h.resource.Spec.Notification
 }
 

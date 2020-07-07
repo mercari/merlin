@@ -14,25 +14,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kouzoh/merlin/alert"
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 	"github.com/kouzoh/merlin/mocks"
 )
 
 func Test_SecretUnusedRuleBasic(t *testing.T) {
-	notification := merlinv1.Notification{
+	notification := merlinv1beta1.Notification{
 		Notifiers:  []string{"testNotifier"},
 		Suppressed: true,
 	}
 
-	merlinv1Rule := &merlinv1.ClusterRuleSecretUnused{
+	merlinv1beta1Rule := &merlinv1beta1.ClusterRuleSecretUnused{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-r"},
-		Spec: merlinv1.ClusterRuleSecretUnusedSpec{
+		Spec: merlinv1beta1.ClusterRuleSecretUnusedSpec{
 			Notification: notification,
 		},
 	}
 
-	r := &SecretUnusedRule{resource: merlinv1Rule}
-	assert.Equal(t, merlinv1Rule.ObjectMeta, r.GetObjectMeta())
+	r := &SecretUnusedRule{resource: merlinv1beta1Rule}
+	assert.Equal(t, merlinv1beta1Rule.ObjectMeta, r.GetObjectMeta())
 	assert.Equal(t, notification, r.GetNotification())
 	assert.Equal(t, "ClusterRuleSecretUnused/test-r", r.GetName())
 
@@ -51,10 +51,10 @@ func Test_SecretUnusedRule_NewRule(t *testing.T) {
 	mockClient := mocks.NewMockClient(mockCtrl)
 	key := client.ObjectKey{Namespace: "test-ns", Name: "test-rule"}
 
-	merlinv1Rule := merlinv1.ClusterRuleSecretUnused{
+	merlinv1beta1Rule := merlinv1beta1.ClusterRuleSecretUnused{
 		ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace, Name: key.Name},
-		Spec: merlinv1.ClusterRuleSecretUnusedSpec{
-			Notification: merlinv1.Notification{
+		Spec: merlinv1beta1.ClusterRuleSecretUnusedSpec{
+			Notification: merlinv1beta1.Notification{
 				Notifiers:  []string{"testNotifier"},
 				Suppressed: true,
 			},
@@ -62,10 +62,10 @@ func Test_SecretUnusedRule_NewRule(t *testing.T) {
 		},
 	}
 	rule := &SecretUnusedRule{}
-	mockClient.EXPECT().Get(ctx, key, &merlinv1.ClusterRuleSecretUnused{}).SetArg(2, merlinv1Rule).Return(nil)
+	mockClient.EXPECT().Get(ctx, key, &merlinv1beta1.ClusterRuleSecretUnused{}).SetArg(2, merlinv1beta1Rule).Return(nil)
 	r, err := rule.New(ctx, mockClient, log, key)
 	assert.NoError(t, err)
-	assert.Equal(t, &merlinv1Rule, r.GetObject())
+	assert.Equal(t, &merlinv1beta1Rule, r.GetObject())
 	delay, err := r.GetDelaySeconds(&corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			CreationTimestamp: metav1.Time{
@@ -91,11 +91,11 @@ func Test_SecretUnusedRule_EvaluateAll(t *testing.T) {
 
 	r := &SecretUnusedRule{
 		rule: rule{cli: mockClient, log: log, status: &Status{}},
-		resource: &merlinv1.ClusterRuleSecretUnused{
+		resource: &merlinv1beta1.ClusterRuleSecretUnused{
 			ObjectMeta: metav1.ObjectMeta{Name: "test-r"},
-			Spec: merlinv1.ClusterRuleSecretUnusedSpec{
+			Spec: merlinv1beta1.ClusterRuleSecretUnusedSpec{
 				IgnoreNamespaces: []string{"ignored-ns"},
-				Notification: merlinv1.Notification{
+				Notification: merlinv1beta1.Notification{
 					Notifiers:  []string{"testNotifier"},
 					Suppressed: true,
 				},

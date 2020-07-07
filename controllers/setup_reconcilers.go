@@ -11,7 +11,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 	"github.com/kouzoh/merlin/rules"
 )
 
@@ -153,10 +153,10 @@ func SetupReconcilers(mgr manager.Manager) error {
 			ruleFactory:   &rules.SecretUnusedRule{},
 		},
 	}).SetupWithManager(mgr,
-		&merlinv1.ClusterRuleSecretUnused{},
+		&merlinv1beta1.ClusterRuleSecretUnused{},
 		nil,
 		func(rawObj runtime.Object) []string {
-			obj := rawObj.(*merlinv1.ClusterRuleSecretUnused)
+			obj := rawObj.(*merlinv1beta1.ClusterRuleSecretUnused)
 			return []string{obj.ObjectMeta.Name}
 		}); err != nil {
 		return err
@@ -172,12 +172,12 @@ func SetupReconcilers(mgr manager.Manager) error {
 			ruleFactory:   &rules.HPAReplicaPercentageRule{},
 		},
 	}).SetupWithManager(mgr,
-		&merlinv1.ClusterRuleHPAReplicaPercentage{},
-		&merlinv1.RuleHPAReplicaPercentage{},
+		&merlinv1beta1.ClusterRuleHPAReplicaPercentage{},
+		&merlinv1beta1.RuleHPAReplicaPercentage{},
 		func(rawObj runtime.Object) []string {
-			if clusterRule, ok := rawObj.(*merlinv1.ClusterRuleHPAReplicaPercentage); ok {
+			if clusterRule, ok := rawObj.(*merlinv1beta1.ClusterRuleHPAReplicaPercentage); ok {
 				return []string{clusterRule.Name}
-			} else if namespaceRule, ok := rawObj.(*merlinv1.RuleHPAReplicaPercentage); ok {
+			} else if namespaceRule, ok := rawObj.(*merlinv1beta1.RuleHPAReplicaPercentage); ok {
 				return []string{namespaceRule.Name}
 			}
 			return []string{}
@@ -195,10 +195,10 @@ func SetupReconcilers(mgr manager.Manager) error {
 			ruleFactory:   &rules.HPAInvalidScaleTargetRefRule{},
 		},
 	}).SetupWithManager(mgr,
-		&merlinv1.ClusterRuleHPAInvalidScaleTargetRef{},
+		&merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRef{},
 		nil,
 		func(rawObj runtime.Object) []string {
-			rule := rawObj.(*merlinv1.ClusterRuleHPAInvalidScaleTargetRef)
+			rule := rawObj.(*merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRef)
 			return []string{rule.Name}
 		}); err != nil {
 		return err
@@ -214,10 +214,10 @@ func SetupReconcilers(mgr manager.Manager) error {
 			ruleFactory:   &rules.NamespaceRequiredLabelRule{},
 		},
 	}).SetupWithManager(mgr,
-		&merlinv1.ClusterRuleNamespaceRequiredLabel{},
+		&merlinv1beta1.ClusterRuleNamespaceRequiredLabel{},
 		nil,
 		func(rawObj runtime.Object) []string {
-			rule := rawObj.(*merlinv1.ClusterRuleNamespaceRequiredLabel)
+			rule := rawObj.(*merlinv1beta1.ClusterRuleNamespaceRequiredLabel)
 			return []string{rule.Name}
 		}); err != nil {
 		return err
@@ -233,10 +233,10 @@ func SetupReconcilers(mgr manager.Manager) error {
 			ruleFactory:   &rules.ServiceInvalidSelectorRule{},
 		},
 	}).SetupWithManager(mgr,
-		&merlinv1.ClusterRuleServiceInvalidSelector{},
+		&merlinv1beta1.ClusterRuleServiceInvalidSelector{},
 		nil,
 		func(rawObj runtime.Object) []string {
-			rule := rawObj.(*merlinv1.ClusterRuleServiceInvalidSelector)
+			rule := rawObj.(*merlinv1beta1.ClusterRuleServiceInvalidSelector)
 			return []string{rule.Name}
 		}); err != nil {
 		return err
@@ -252,10 +252,10 @@ func SetupReconcilers(mgr manager.Manager) error {
 			ruleFactory:   &rules.PDBInvalidSelectorRule{},
 		},
 	}).SetupWithManager(mgr,
-		&merlinv1.ClusterRulePDBInvalidSelector{},
+		&merlinv1beta1.ClusterRulePDBInvalidSelector{},
 		nil,
 		func(rawObj runtime.Object) []string {
-			rule := rawObj.(*merlinv1.ClusterRulePDBInvalidSelector)
+			rule := rawObj.(*merlinv1beta1.ClusterRulePDBInvalidSelector)
 			return []string{rule.Name}
 		}); err != nil {
 		return err
@@ -271,12 +271,12 @@ func SetupReconcilers(mgr manager.Manager) error {
 			ruleFactory:   &rules.PDBMinAllowedDisruptionRule{},
 		},
 	}).SetupWithManager(mgr,
-		&merlinv1.ClusterRulePDBMinAllowedDisruption{},
-		&merlinv1.RulePDBMinAllowedDisruption{},
+		&merlinv1beta1.ClusterRulePDBMinAllowedDisruption{},
+		&merlinv1beta1.RulePDBMinAllowedDisruption{},
 		func(rawObj runtime.Object) []string {
-			if clusterRule, ok := rawObj.(*merlinv1.ClusterRulePDBMinAllowedDisruption); ok {
+			if clusterRule, ok := rawObj.(*merlinv1beta1.ClusterRulePDBMinAllowedDisruption); ok {
 				return []string{clusterRule.Name}
-			} else if namespaceRule, ok := rawObj.(*merlinv1.RulePDBMinAllowedDisruption); ok {
+			} else if namespaceRule, ok := rawObj.(*merlinv1beta1.RulePDBMinAllowedDisruption); ok {
 				return []string{namespaceRule.Name}
 			}
 			return []string{}

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 	"github.com/kouzoh/merlin/controllers"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,7 +39,7 @@ var (
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 
-	_ = merlinv1.AddToScheme(scheme)
+	_ = merlinv1beta1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 

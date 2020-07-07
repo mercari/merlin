@@ -14,19 +14,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kouzoh/merlin/alert"
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 )
 
 type HPAInvalidScaleTargetRefRule struct {
 	rule
-	resource *merlinv1.ClusterRuleHPAInvalidScaleTargetRef
+	resource *merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRef
 }
 
 func (h *HPAInvalidScaleTargetRefRule) New(ctx context.Context, cli client.Client, logger logr.Logger, key client.ObjectKey) (Rule, error) {
 	h.cli = cli
 	h.log = logger
 	h.status = &Status{}
-	h.resource = &merlinv1.ClusterRuleHPAInvalidScaleTargetRef{}
+	h.resource = &merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRef{}
 	if err := h.cli.Get(ctx, key, h.resource); err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func (h HPAInvalidScaleTargetRefRule) GetObjectMeta() metav1.ObjectMeta {
 	return h.resource.ObjectMeta
 }
 
-func (h HPAInvalidScaleTargetRefRule) GetNotification() merlinv1.Notification {
+func (h HPAInvalidScaleTargetRefRule) GetNotification() merlinv1beta1.Notification {
 	return h.resource.Spec.Notification
 }
 

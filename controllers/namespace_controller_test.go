@@ -15,7 +15,7 @@ import (
 	// +kubebuilder:scaffold:imports
 
 	"github.com/kouzoh/merlin/alert"
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 	"github.com/kouzoh/merlin/notifiers"
 )
 
@@ -24,17 +24,17 @@ var _ = Describe("NamespaceControllerTests", func() {
 
 	Context("TestClusterRuleNamespaceRequiredLabel", func() {
 		const kubeSystemNamespace = "kube-system"
-		var ruleStructName = GetStructName(merlinv1.ClusterRuleNamespaceRequiredLabel{})
-		var notifier = &merlinv1.Notifier{
+		var ruleStructName = GetStructName(merlinv1beta1.ClusterRuleNamespaceRequiredLabel{})
+		var notifier = &merlinv1beta1.Notifier{
 			ObjectMeta: metav1.ObjectMeta{Name: strings.ToLower(ruleStructName) + "-notifier"},
-			Spec:       merlinv1.NotifierSpec{NotifyInterval: 1},
+			Spec:       merlinv1beta1.NotifierSpec{NotifyInterval: 1},
 		}
-		var rule = &merlinv1.ClusterRuleNamespaceRequiredLabel{
+		var rule = &merlinv1beta1.ClusterRuleNamespaceRequiredLabel{
 			ObjectMeta: metav1.ObjectMeta{Name: "test-ns-cluster-rule"},
-			Spec: merlinv1.ClusterRuleNamespaceRequiredLabelSpec{
+			Spec: merlinv1beta1.ClusterRuleNamespaceRequiredLabelSpec{
 				IgnoreNamespaces: []string{kubeSystemNamespace},
-				Notification:     merlinv1.Notification{Notifiers: []string{notifier.Name}},
-				Label:            merlinv1.RequiredLabel{Key: "istio-injection", Value: "enabled"},
+				Notification:     merlinv1beta1.Notification{Notifiers: []string{notifier.Name}},
+				Label:            merlinv1beta1.RequiredLabel{Key: "istio-injection", Value: "enabled"},
 			},
 		}
 
@@ -63,7 +63,7 @@ var _ = Describe("NamespaceControllerTests", func() {
 		})
 
 		It("TestApplyEmptyClusterRuleNamespaceRequiredLabel", func() {
-			err := k8sClient.Create(ctx, &merlinv1.ClusterRuleNamespaceRequiredLabel{
+			err := k8sClient.Create(ctx, &merlinv1beta1.ClusterRuleNamespaceRequiredLabel{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: strings.ToLower(CurrentGinkgoTestDescription().TestText),
 				},
@@ -72,8 +72,8 @@ var _ = Describe("NamespaceControllerTests", func() {
 			s, ok := err.(interface{}).(*errors.StatusError)
 			Expect(ok).To(Equal(true))
 			Expect(s.ErrStatus.Code).To(Equal(int32(422)))
-			Expect(s.ErrStatus.Details.Group).To(Equal(merlinv1.GROUP))
-			Expect(s.ErrStatus.Kind).To(Equal(merlinv1.ClusterRuleNamespaceRequiredLabel{}.Kind))
+			Expect(s.ErrStatus.Details.Group).To(Equal(merlinv1beta1.GROUP))
+			Expect(s.ErrStatus.Kind).To(Equal(merlinv1beta1.ClusterRuleNamespaceRequiredLabel{}.Kind))
 			Expect(s.ErrStatus.Details.Causes[0].Type).To(Equal(metav1.CauseTypeFieldValueInvalid))
 		})
 
@@ -81,7 +81,7 @@ var _ = Describe("NamespaceControllerTests", func() {
 			By("Create rule ")
 			Expect(k8sClient.Create(ctx, rule)).Should(Succeed(), "Failed to apply cluster rule")
 			Eventually(func() []string {
-				r := &merlinv1.ClusterRuleNamespaceRequiredLabel{}
+				r := &merlinv1beta1.ClusterRuleNamespaceRequiredLabel{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: rule.Name}, r)).Should(Succeed())
 				return r.Finalizers
 			}, time.Second*5, time.Millisecond*200).Should(ContainElement(FinalizerName))
@@ -90,7 +90,7 @@ var _ = Describe("NamespaceControllerTests", func() {
 
 			By("Alert should be added to notifier status")
 			Eventually(func() map[string]alert.Alert {
-				n := &merlinv1.Notifier{}
+				n := &merlinv1beta1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).Should(HaveKey(alertKey))
@@ -98,7 +98,7 @@ var _ = Describe("NamespaceControllerTests", func() {
 
 			By("Ignored Namespace should not have alert")
 			ignoredAlertKey := strings.Join([]string{ruleStructName, rule.Name, "", kubeSystemNamespace}, Separator)
-			n := &merlinv1.Notifier{}
+			n := &merlinv1beta1.Notifier{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 			Expect(n.Status.Alerts).ShouldNot(HaveKey(ignoredAlertKey))
 			Expect(notifierReconciler.cache.Notifiers[notifier.Name].Resource.Status.Alerts).ShouldNot(HaveKey(ignoredAlertKey))
@@ -108,7 +108,7 @@ var _ = Describe("NamespaceControllerTests", func() {
 			Expect(k8sClient.Delete(ctx, rule)).Should(Succeed())
 			// alert should be removed from notifier status
 			Eventually(func() map[string]alert.Alert {
-				n := &merlinv1.Notifier{}
+				n := &merlinv1beta1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).ShouldNot(HaveKey(alertKey))
@@ -123,7 +123,7 @@ var _ = Describe("NamespaceControllerTests", func() {
 
 			By("Alert should be added to notifier status")
 			Eventually(func() map[string]alert.Alert {
-				n := &merlinv1.Notifier{}
+				n := &merlinv1beta1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).Should(HaveKey(alertKey))

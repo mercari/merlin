@@ -15,19 +15,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kouzoh/merlin/alert"
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 )
 
 type PDBInvalidSelectorRule struct {
 	rule
-	resource *merlinv1.ClusterRulePDBInvalidSelector
+	resource *merlinv1beta1.ClusterRulePDBInvalidSelector
 }
 
 func (s *PDBInvalidSelectorRule) New(ctx context.Context, cli client.Client, logger logr.Logger, key client.ObjectKey) (Rule, error) {
 	s.cli = cli
 	s.log = logger
 	s.status = &Status{}
-	s.resource = &merlinv1.ClusterRulePDBInvalidSelector{}
+	s.resource = &merlinv1beta1.ClusterRulePDBInvalidSelector{}
 	if err := s.cli.Get(ctx, key, s.resource); err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (s PDBInvalidSelectorRule) GetObjectMeta() metav1.ObjectMeta {
 	return s.resource.ObjectMeta
 }
 
-func (s PDBInvalidSelectorRule) GetNotification() merlinv1.Notification {
+func (s PDBInvalidSelectorRule) GetNotification() merlinv1beta1.Notification {
 	return s.resource.Spec.Notification
 }
 

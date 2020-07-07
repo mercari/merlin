@@ -1,4 +1,4 @@
-apiVersion: merlin.mercari.com/v1
+apiVersion: merlin.mercari.com/v1beta1
 kind: ClusterRulePDBMinAllowedDisruption
 metadata:
   name: cluster-rule-pdb-min-allowed-disruption

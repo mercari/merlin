@@ -14,19 +14,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kouzoh/merlin/alert"
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 )
 
 type ServiceInvalidSelectorRule struct {
 	rule
-	resource *merlinv1.ClusterRuleServiceInvalidSelector
+	resource *merlinv1beta1.ClusterRuleServiceInvalidSelector
 }
 
 func (s *ServiceInvalidSelectorRule) New(ctx context.Context, cli client.Client, logger logr.Logger, key client.ObjectKey) (Rule, error) {
 	s.cli = cli
 	s.log = logger
 	s.status = &Status{}
-	s.resource = &merlinv1.ClusterRuleServiceInvalidSelector{}
+	s.resource = &merlinv1beta1.ClusterRuleServiceInvalidSelector{}
 	if err := s.cli.Get(ctx, key, s.resource); err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func (s ServiceInvalidSelectorRule) GetObjectMeta() metav1.ObjectMeta {
 	return s.resource.ObjectMeta
 }
 
-func (s ServiceInvalidSelectorRule) GetNotification() merlinv1.Notification {
+func (s ServiceInvalidSelectorRule) GetNotification() merlinv1beta1.Notification {
 	return s.resource.Spec.Notification
 }
 

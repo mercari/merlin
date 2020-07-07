@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/kouzoh/merlin/alert"
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 	"github.com/kouzoh/merlin/notifiers"
 )
 
@@ -37,7 +37,7 @@ func (r *NotifierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	l := r.log.WithName("Reconcile").WithValues("namespace", req.Namespace, "name", req.Name)
 
-	notifierObject := merlinv1.Notifier{}
+	notifierObject := merlinv1beta1.Notifier{}
 	if err := r.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: req.Name}, &notifierObject); err != nil {
 		if apierrs.IsNotFound(err) {
 			if _, ok := r.cache.Notifiers[req.Name]; ok {
@@ -56,7 +56,7 @@ func (r *NotifierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	if !ok { // new notifier is created, just add to cache and waits for next iteration to send notifications.
 		l.Info("Manager restarted or new notifier is created", "notifier", req.Name, "status", notifierObject.Status)
 		if notifierObject.Status.Alerts == nil {
-			notifierObject.Status = merlinv1.NotifierStatus{Alerts: map[string]alert.Alert{}}
+			notifierObject.Status = merlinv1beta1.NotifierStatus{Alerts: map[string]alert.Alert{}}
 		}
 		r.cache.Notifiers[req.Name] = &notifiers.Notifier{Resource: &notifierObject, Client: r.httpClient}
 		r.cache.IsReady = true
@@ -79,7 +79,7 @@ func (r *NotifierReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.cache = &notifiers.Cache{Notifiers: map[string]*notifiers.Notifier{}}
 	l.Info("initialize manager")
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&merlinv1.Notifier{}).
+		For(&merlinv1beta1.Notifier{}).
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		Complete(r)
 }

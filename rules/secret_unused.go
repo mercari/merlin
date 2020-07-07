@@ -13,12 +13,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kouzoh/merlin/alert"
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 )
 
 type SecretUnusedRule struct {
 	// resource is the api resource this Rule uses
-	resource *merlinv1.ClusterRuleSecretUnused
+	resource *merlinv1beta1.ClusterRuleSecretUnused
 	rule
 }
 
@@ -26,7 +26,7 @@ func (s *SecretUnusedRule) New(ctx context.Context, cli client.Client, logger lo
 	s.cli = cli
 	s.log = logger
 	s.status = &Status{}
-	s.resource = &merlinv1.ClusterRuleSecretUnused{}
+	s.resource = &merlinv1beta1.ClusterRuleSecretUnused{}
 	if err := s.cli.Get(ctx, key, s.resource); err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func (s SecretUnusedRule) GetObjectMeta() metav1.ObjectMeta {
 	return s.resource.ObjectMeta
 }
 
-func (s SecretUnusedRule) GetNotification() merlinv1.Notification {
+func (s SecretUnusedRule) GetNotification() merlinv1beta1.Notification {
 	return s.resource.Spec.Notification
 }
 

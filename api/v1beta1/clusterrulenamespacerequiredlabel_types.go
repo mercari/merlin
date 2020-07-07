@@ -13,42 +13,42 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ClusterRuleSecretUnusedSpec defines the desired state of ClusterRuleSecretUnused
-type ClusterRuleSecretUnusedSpec struct {
+// ClusterRuleNamespaceRequiredLabelSpec defines the desired state of ClusterRuleNamespaceRequiredLabel
+type ClusterRuleNamespaceRequiredLabelSpec struct {
 	// IgnoreNamespaces is the list of namespaces to ignore for this rule
 	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
 	// Notification contains the channels and messages to send out to external system, such as slack or pagerduty.
 	Notification Notification `json:"notification"`
-	// InitialDelaySeconds is the delay time before the check is being run
-	InitialDelaySeconds int64 `json:"initialDelaySeconds,omitempty"`
+	// Label is the required label for this namespace, specified key, value, and a match
+	Label RequiredLabel `json:"label"`
 }
 
 // +kubebuilder:object:root=true
 
-// ClusterRuleSecretUnusedList contains a list of ClusterRuleSecretUnused
-type ClusterRuleSecretUnusedList struct {
+// ClusterRuleNamespaceRequiredLabelList contains a list of ClusterRuleNamespaceRequiredLabel
+type ClusterRuleNamespaceRequiredLabelList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ClusterRuleSecretUnused `json:"items"`
+	Items           []ClusterRuleNamespaceRequiredLabel `json:"items"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
 
-// ClusterRuleSecretUnused is the Schema for the clusterrulesecretunuseds API
-type ClusterRuleSecretUnused struct {
+// ClusterRuleNamespaceRequiredLabel is the Schema for the clusterrulenamespacerequiredlabels API
+type ClusterRuleNamespaceRequiredLabel struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec ClusterRuleSecretUnusedSpec `json:"spec,omitempty"`
+	Spec ClusterRuleNamespaceRequiredLabelSpec `json:"spec,omitempty"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ClusterRuleSecretUnused{}, &ClusterRuleSecretUnusedList{})
+	SchemeBuilder.Register(&ClusterRuleNamespaceRequiredLabel{}, &ClusterRuleNamespaceRequiredLabelList{})
 }

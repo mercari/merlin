@@ -13,40 +13,41 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ClusterRuleServiceInvalidSelectorSpec defines the desired state of ClusterRuleServiceInvalidSelector
-type ClusterRuleServiceInvalidSelectorSpec struct {
-	// IgnoreNamespaces is the list of namespaces to ignore for this rule
-	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
+// RulePDBMinAllowedDisruptionSpec defines the desired state of RulePDBMinAllowedDisruption
+type RulePDBMinAllowedDisruptionSpec struct {
 	// Notification contains the channels and messages to send out to external system, such as slack or pagerduty.
 	Notification Notification `json:"notification"`
+	// Selector selects name or matched labels for a resource to apply this rule
+	Selector Selector `json:"selector"`
+	// MinAllowedDisruption is the minimal allowed disruption for this rule, should be an integer, default to 1
+	MinAllowedDisruption int `json:"minAllowedDisruption,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// ClusterRuleServiceInvalidSelectorList contains a list of ClusterRuleServiceInvalidSelector
-type ClusterRuleServiceInvalidSelectorList struct {
+// RulePDBMinAllowedDisruptionList contains a list of RulePDBMinAllowedDisruption
+type RulePDBMinAllowedDisruptionList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ClusterRuleServiceInvalidSelector `json:"items"`
+	Items           []RulePDBMinAllowedDisruption `json:"items"`
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:scope=Cluster
 
-// ClusterRuleServiceInvalidSelector is the Schema for the clusterruleserviceinvalidselector API
-type ClusterRuleServiceInvalidSelector struct {
+// RulePDBMinAllowedDisruption is the Schema for the rulepdbminalloweddisruptions API
+type RulePDBMinAllowedDisruption struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec ClusterRuleServiceInvalidSelectorSpec `json:"spec,omitempty"`
+	Spec RulePDBMinAllowedDisruptionSpec `json:"spec,omitempty"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ClusterRuleServiceInvalidSelector{}, &ClusterRuleServiceInvalidSelectorList{})
+	SchemeBuilder.Register(&RulePDBMinAllowedDisruption{}, &RulePDBMinAllowedDisruptionList{})
 }

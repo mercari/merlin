@@ -13,42 +13,40 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ClusterRuleNamespaceRequiredLabelSpec defines the desired state of ClusterRuleNamespaceRequiredLabel
-type ClusterRuleNamespaceRequiredLabelSpec struct {
+// ClusterRuleHPAInvalidScaleTargetRefSpec defines the desired state of ClusterRuleHPAInvalidScaleTargetRef
+type ClusterRuleHPAInvalidScaleTargetRefSpec struct {
 	// IgnoreNamespaces is the list of namespaces to ignore for this rule
 	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
 	// Notification contains the channels and messages to send out to external system, such as slack or pagerduty.
 	Notification Notification `json:"notification"`
-	// Label is the required label for this namespace, specified key, value, and a match
-	Label RequiredLabel `json:"label"`
 }
 
 // +kubebuilder:object:root=true
 
-// ClusterRuleNamespaceRequiredLabelList contains a list of ClusterRuleNamespaceRequiredLabel
-type ClusterRuleNamespaceRequiredLabelList struct {
+// ClusterRuleHPAInvalidScaleTargetRefList contains a list of ClusterRuleHPAInvalidScaleTargetRef
+type ClusterRuleHPAInvalidScaleTargetRefList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ClusterRuleNamespaceRequiredLabel `json:"items"`
+	Items           []ClusterRuleHPAInvalidScaleTargetRef `json:"items"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
 
-// ClusterRuleNamespaceRequiredLabel is the Schema for the clusterrulenamespacerequiredlabels API
-type ClusterRuleNamespaceRequiredLabel struct {
+// ClusterRuleHPAInvalidScaleTargetRef is the Schema for the cluster rule hpa invalid scale target refs API
+type ClusterRuleHPAInvalidScaleTargetRef struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec ClusterRuleNamespaceRequiredLabelSpec `json:"spec,omitempty"`
+	Spec ClusterRuleHPAInvalidScaleTargetRefSpec `json:"spec,omitempty"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ClusterRuleNamespaceRequiredLabel{}, &ClusterRuleNamespaceRequiredLabelList{})
+	SchemeBuilder.Register(&ClusterRuleHPAInvalidScaleTargetRef{}, &ClusterRuleHPAInvalidScaleTargetRefList{})
 }

@@ -14,26 +14,26 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kouzoh/merlin/alert"
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 	"github.com/kouzoh/merlin/mocks"
 )
 
 func Test_NamespaceRequiredLabelRule_Basic(t *testing.T) {
-	notification := merlinv1.Notification{
+	notification := merlinv1beta1.Notification{
 		Notifiers:  []string{"testNotifier"},
 		Suppressed: true,
 	}
 
-	merlinv1Rule := &merlinv1.ClusterRuleNamespaceRequiredLabel{
+	merlinv1beta1Rule := &merlinv1beta1.ClusterRuleNamespaceRequiredLabel{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-r"},
-		Spec: merlinv1.ClusterRuleNamespaceRequiredLabelSpec{
+		Spec: merlinv1beta1.ClusterRuleNamespaceRequiredLabelSpec{
 			Notification: notification,
 		},
 	}
 
-	r := &NamespaceRequiredLabelRule{resource: merlinv1Rule}
-	assert.Equal(t, merlinv1Rule.ObjectMeta, r.GetObjectMeta())
-	assert.Equal(t, merlinv1Rule, r.GetObject())
+	r := &NamespaceRequiredLabelRule{resource: merlinv1beta1Rule}
+	assert.Equal(t, merlinv1beta1Rule.ObjectMeta, r.GetObjectMeta())
+	assert.Equal(t, merlinv1beta1Rule, r.GetObject())
 	assert.Equal(t, notification, r.GetNotification())
 	assert.Equal(t, "ClusterRuleNamespaceRequiredLabel/test-r", r.GetName())
 
@@ -54,7 +54,7 @@ func Test_NamespaceRequiredLabelRuleBasic_Evaluate(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockClient := mocks.NewMockClient(mockCtrl)
 	ruleFactory := &NamespaceRequiredLabelRule{}
-	notification := merlinv1.Notification{Notifiers: []string{"testNotifier"}}
+	notification := merlinv1beta1.Notification{Notifiers: []string{"testNotifier"}}
 	ruleKey := client.ObjectKey{Namespace: "", Name: "rule"}
 
 	cases := []struct {
@@ -70,7 +70,7 @@ func Test_NamespaceRequiredLabelRuleBasic_Evaluate(t *testing.T) {
 			key:  ruleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, ruleKey, &merlinv1.ClusterRuleNamespaceRequiredLabel{}).
+					Get(ctx, ruleKey, &merlinv1beta1.ClusterRuleNamespaceRequiredLabel{}).
 					Return(nil),
 			},
 			resource:  "non-namespace",
@@ -81,9 +81,9 @@ func Test_NamespaceRequiredLabelRuleBasic_Evaluate(t *testing.T) {
 			key:  ruleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, ruleKey, &merlinv1.ClusterRuleNamespaceRequiredLabel{}).
-					SetArg(2, merlinv1.ClusterRuleNamespaceRequiredLabel{
-						Spec: merlinv1.ClusterRuleNamespaceRequiredLabelSpec{
+					Get(ctx, ruleKey, &merlinv1beta1.ClusterRuleNamespaceRequiredLabel{}).
+					SetArg(2, merlinv1beta1.ClusterRuleNamespaceRequiredLabel{
+						Spec: merlinv1beta1.ClusterRuleNamespaceRequiredLabelSpec{
 							Notification:     notification,
 							IgnoreNamespaces: []string{"ignoredNS"},
 						},
@@ -104,10 +104,10 @@ func Test_NamespaceRequiredLabelRuleBasic_Evaluate(t *testing.T) {
 			key:  ruleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, ruleKey, &merlinv1.ClusterRuleNamespaceRequiredLabel{}).
-					SetArg(2, merlinv1.ClusterRuleNamespaceRequiredLabel{
-						Spec: merlinv1.ClusterRuleNamespaceRequiredLabelSpec{
-							Label:        merlinv1.RequiredLabel{Key: "istio-injection", Value: "enabled"},
+					Get(ctx, ruleKey, &merlinv1beta1.ClusterRuleNamespaceRequiredLabel{}).
+					SetArg(2, merlinv1beta1.ClusterRuleNamespaceRequiredLabel{
+						Spec: merlinv1beta1.ClusterRuleNamespaceRequiredLabelSpec{
+							Label:        merlinv1beta1.RequiredLabel{Key: "istio-injection", Value: "enabled"},
 							Notification: notification,
 						},
 					}).
@@ -149,12 +149,12 @@ func Test_NamespaceRequiredLabelRuleBasic_EvaluateAll(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	mockClient := mocks.NewMockClient(mockCtrl)
-	notification := merlinv1.Notification{Notifiers: []string{"testNotifier"}}
+	notification := merlinv1beta1.Notification{Notifiers: []string{"testNotifier"}}
 	r := &NamespaceRequiredLabelRule{
 		rule: rule{cli: mockClient, log: log, status: &Status{}},
-		resource: &merlinv1.ClusterRuleNamespaceRequiredLabel{
-			Spec: merlinv1.ClusterRuleNamespaceRequiredLabelSpec{
-				Label:        merlinv1.RequiredLabel{Key: "istio-injection", Value: "enabled"},
+		resource: &merlinv1beta1.ClusterRuleNamespaceRequiredLabel{
+			Spec: merlinv1beta1.ClusterRuleNamespaceRequiredLabelSpec{
+				Label:        merlinv1beta1.RequiredLabel{Key: "istio-injection", Value: "enabled"},
 				Notification: notification,
 			},
 		},

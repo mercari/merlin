@@ -11,7 +11,7 @@ import (
 
 	"github.com/kouzoh/merlin/alert"
 	"github.com/kouzoh/merlin/alert/slack"
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 )
 
 func Test_Notifier(t *testing.T) {
@@ -22,15 +22,15 @@ func Test_Notifier(t *testing.T) {
 	})
 	ts := httptest.NewServer(m)
 	defer ts.Close()
-	notifierResource := &merlinv1.Notifier{
-		Spec: merlinv1.NotifierSpec{
+	notifierResource := &merlinv1beta1.Notifier{
+		Spec: merlinv1beta1.NotifierSpec{
 			Slack: slack.Spec{
 				Severity:   alert.SeverityWarning,
 				WebhookURL: ts.URL,
 				Channel:    "test-channel",
 			},
 		},
-		Status: merlinv1.NotifierStatus{Alerts: map[string]alert.Alert{}},
+		Status: merlinv1beta1.NotifierStatus{Alerts: map[string]alert.Alert{}},
 	}
 	notifier := Notifier{
 		Resource: notifierResource,

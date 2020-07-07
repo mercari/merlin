@@ -16,26 +16,26 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kouzoh/merlin/alert"
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 	"github.com/kouzoh/merlin/mocks"
 )
 
 func Test_HPAInvalidScaleTargetRefRuleBasic(t *testing.T) {
-	notification := merlinv1.Notification{
+	notification := merlinv1beta1.Notification{
 		Notifiers:  []string{"testNotifier"},
 		Suppressed: true,
 	}
 
-	merlinv1Rule := &merlinv1.ClusterRuleHPAInvalidScaleTargetRef{
+	merlinv1beta1Rule := &merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRef{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-r"},
-		Spec: merlinv1.ClusterRuleHPAInvalidScaleTargetRefSpec{
+		Spec: merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRefSpec{
 			Notification: notification,
 		},
 	}
 
-	r := &HPAInvalidScaleTargetRefRule{resource: merlinv1Rule}
-	assert.Equal(t, merlinv1Rule.ObjectMeta, r.GetObjectMeta())
-	assert.Equal(t, merlinv1Rule, r.GetObject())
+	r := &HPAInvalidScaleTargetRefRule{resource: merlinv1beta1Rule}
+	assert.Equal(t, merlinv1beta1Rule.ObjectMeta, r.GetObjectMeta())
+	assert.Equal(t, merlinv1beta1Rule, r.GetObject())
 	assert.Equal(t, notification, r.GetNotification())
 	assert.Equal(t, "ClusterRuleHPAInvalidScaleTargetRef/test-r", r.GetName())
 
@@ -56,7 +56,7 @@ func Test_HPAInvalidScaleTargetRefRule_Evaluate(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockClient := mocks.NewMockClient(mockCtrl)
 	ruleFactory := &HPAInvalidScaleTargetRefRule{}
-	notification := merlinv1.Notification{Notifiers: []string{"testNotifier"}}
+	notification := merlinv1beta1.Notification{Notifiers: []string{"testNotifier"}}
 	ruleKey := client.ObjectKey{Namespace: "", Name: "rule"}
 
 	cases := []struct {
@@ -72,7 +72,7 @@ func Test_HPAInvalidScaleTargetRefRule_Evaluate(t *testing.T) {
 			key:  ruleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, ruleKey, &merlinv1.ClusterRuleHPAInvalidScaleTargetRef{}).
+					Get(ctx, ruleKey, &merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRef{}).
 					Return(nil),
 			},
 			resource:  "non-hpa",
@@ -83,9 +83,9 @@ func Test_HPAInvalidScaleTargetRefRule_Evaluate(t *testing.T) {
 			key:  ruleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, ruleKey, &merlinv1.ClusterRuleHPAInvalidScaleTargetRef{}).
-					SetArg(2, merlinv1.ClusterRuleHPAInvalidScaleTargetRef{
-						Spec: merlinv1.ClusterRuleHPAInvalidScaleTargetRefSpec{
+					Get(ctx, ruleKey, &merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRef{}).
+					SetArg(2, merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRef{
+						Spec: merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRefSpec{
 							Notification:     notification,
 							IgnoreNamespaces: []string{"ignoredNS"},
 						},
@@ -106,9 +106,9 @@ func Test_HPAInvalidScaleTargetRefRule_Evaluate(t *testing.T) {
 			key:  ruleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, ruleKey, &merlinv1.ClusterRuleHPAInvalidScaleTargetRef{}).
-					SetArg(2, merlinv1.ClusterRuleHPAInvalidScaleTargetRef{
-						Spec: merlinv1.ClusterRuleHPAInvalidScaleTargetRefSpec{
+					Get(ctx, ruleKey, &merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRef{}).
+					SetArg(2, merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRef{
+						Spec: merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRefSpec{
 							Notification: notification,
 						},
 					}).
@@ -135,9 +135,9 @@ func Test_HPAInvalidScaleTargetRefRule_Evaluate(t *testing.T) {
 			key:  ruleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, ruleKey, &merlinv1.ClusterRuleHPAInvalidScaleTargetRef{}).
-					SetArg(2, merlinv1.ClusterRuleHPAInvalidScaleTargetRef{
-						Spec: merlinv1.ClusterRuleHPAInvalidScaleTargetRefSpec{
+					Get(ctx, ruleKey, &merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRef{}).
+					SetArg(2, merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRef{
+						Spec: merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRefSpec{
 							Notification: notification,
 						},
 					}).
@@ -166,9 +166,9 @@ func Test_HPAInvalidScaleTargetRefRule_Evaluate(t *testing.T) {
 			key:  ruleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, ruleKey, &merlinv1.ClusterRuleHPAInvalidScaleTargetRef{}).
-					SetArg(2, merlinv1.ClusterRuleHPAInvalidScaleTargetRef{
-						Spec: merlinv1.ClusterRuleHPAInvalidScaleTargetRefSpec{
+					Get(ctx, ruleKey, &merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRef{}).
+					SetArg(2, merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRef{
+						Spec: merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRefSpec{
 							Notification: notification,
 						},
 					}).
@@ -195,9 +195,9 @@ func Test_HPAInvalidScaleTargetRefRule_Evaluate(t *testing.T) {
 			key:  ruleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, ruleKey, &merlinv1.ClusterRuleHPAInvalidScaleTargetRef{}).
-					SetArg(2, merlinv1.ClusterRuleHPAInvalidScaleTargetRef{
-						Spec: merlinv1.ClusterRuleHPAInvalidScaleTargetRefSpec{
+					Get(ctx, ruleKey, &merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRef{}).
+					SetArg(2, merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRef{
+						Spec: merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRefSpec{
 							Notification: notification,
 						},
 					}).
@@ -226,9 +226,9 @@ func Test_HPAInvalidScaleTargetRefRule_Evaluate(t *testing.T) {
 			key:  ruleKey,
 			mockCalls: []*gomock.Call{
 				mockClient.EXPECT().
-					Get(ctx, ruleKey, &merlinv1.ClusterRuleHPAInvalidScaleTargetRef{}).
-					SetArg(2, merlinv1.ClusterRuleHPAInvalidScaleTargetRef{
-						Spec: merlinv1.ClusterRuleHPAInvalidScaleTargetRefSpec{
+					Get(ctx, ruleKey, &merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRef{}).
+					SetArg(2, merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRef{
+						Spec: merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRefSpec{
 							Notification: notification,
 						},
 					}).
@@ -268,11 +268,11 @@ func Test_HPAInvalidScaleTargetRefRule_EvaluateAll(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	mockClient := mocks.NewMockClient(mockCtrl)
-	notification := merlinv1.Notification{Notifiers: []string{"testNotifier"}}
+	notification := merlinv1beta1.Notification{Notifiers: []string{"testNotifier"}}
 	r := &HPAInvalidScaleTargetRefRule{
 		rule: rule{cli: mockClient, log: log, status: &Status{}},
-		resource: &merlinv1.ClusterRuleHPAInvalidScaleTargetRef{
-			Spec: merlinv1.ClusterRuleHPAInvalidScaleTargetRefSpec{
+		resource: &merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRef{
+			Spec: merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRefSpec{
 				Notification: notification,
 			},
 		},

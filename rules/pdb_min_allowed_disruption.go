@@ -16,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kouzoh/merlin/alert"
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 )
 
 type PDBMinAllowedDisruptionRule struct{}
@@ -24,7 +24,7 @@ type PDBMinAllowedDisruptionRule struct{}
 func (p *PDBMinAllowedDisruptionRule) New(ctx context.Context, cli client.Client, logger logr.Logger, key client.ObjectKey) (Rule, error) {
 	var r Rule
 	if key.Namespace == "" {
-		resource := &merlinv1.ClusterRulePDBMinAllowedDisruption{}
+		resource := &merlinv1beta1.ClusterRulePDBMinAllowedDisruption{}
 		if err := cli.Get(ctx, key, resource); err != nil {
 			return nil, err
 		}
@@ -33,7 +33,7 @@ func (p *PDBMinAllowedDisruptionRule) New(ctx context.Context, cli client.Client
 			rule:     rule{cli: cli, log: logger, status: &Status{}},
 		}
 	} else {
-		resource := &merlinv1.RulePDBMinAllowedDisruption{}
+		resource := &merlinv1beta1.RulePDBMinAllowedDisruption{}
 		if err := cli.Get(ctx, key, resource); err != nil {
 			return nil, err
 		}
@@ -47,7 +47,7 @@ func (p *PDBMinAllowedDisruptionRule) New(ctx context.Context, cli client.Client
 
 type pdbMinAllowedDisruptionClusterRule struct {
 	rule
-	resource *merlinv1.ClusterRulePDBMinAllowedDisruption
+	resource *merlinv1beta1.ClusterRulePDBMinAllowedDisruption
 }
 
 func (p *pdbMinAllowedDisruptionClusterRule) GetObject() runtime.Object {
@@ -62,7 +62,7 @@ func (p pdbMinAllowedDisruptionClusterRule) GetObjectMeta() metav1.ObjectMeta {
 	return p.resource.ObjectMeta
 }
 
-func (p pdbMinAllowedDisruptionClusterRule) GetNotification() merlinv1.Notification {
+func (p pdbMinAllowedDisruptionClusterRule) GetNotification() merlinv1beta1.Notification {
 	return p.resource.Spec.Notification
 }
 
@@ -158,7 +158,7 @@ func (p *pdbMinAllowedDisruptionClusterRule) GetDelaySeconds(object interface{})
 
 type pdbMinAllowedDisruptionNamespaceRule struct {
 	rule
-	resource *merlinv1.RulePDBMinAllowedDisruption
+	resource *merlinv1beta1.RulePDBMinAllowedDisruption
 }
 
 func (p *pdbMinAllowedDisruptionNamespaceRule) GetObject() runtime.Object {
@@ -173,7 +173,7 @@ func (p pdbMinAllowedDisruptionNamespaceRule) GetObjectMeta() metav1.ObjectMeta 
 	return p.resource.ObjectMeta
 }
 
-func (p pdbMinAllowedDisruptionNamespaceRule) GetNotification() merlinv1.Notification {
+func (p pdbMinAllowedDisruptionNamespaceRule) GetNotification() merlinv1beta1.Notification {
 	return p.resource.Spec.Notification
 }
 

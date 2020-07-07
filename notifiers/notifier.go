@@ -7,10 +7,10 @@ import (
 
 	"github.com/kouzoh/merlin/alert"
 	"github.com/kouzoh/merlin/alert/slack"
-	merlinv1 "github.com/kouzoh/merlin/api/v1"
+	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
 )
 
-const Separator = merlinv1.Separator
+const Separator = merlinv1beta1.Separator
 
 type Cache struct {
 	Notifiers map[string]*Notifier
@@ -18,7 +18,7 @@ type Cache struct {
 }
 
 type Notifier struct {
-	Resource *merlinv1.Notifier
+	Resource *merlinv1beta1.Notifier
 	Client   *http.Client
 }
 
