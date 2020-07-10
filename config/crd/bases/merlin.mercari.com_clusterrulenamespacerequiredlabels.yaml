@@ -4,7 +4,7 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.2.9
+    controller-gen.kubebuilder.io/version: v0.3.0
   creationTimestamp: null
   name: clusterrulenamespacerequiredlabels.merlin.mercari.com
 spec:
@@ -17,71 +17,56 @@ spec:
   scope: Cluster
   validation:
     openAPIV3Schema:
-      description: ClusterRuleNamespaceRequiredLabel is the Schema for the clusterrulenamespacerequiredlabels
-        API
+      description: ClusterRuleNamespaceRequiredLabel is the Schema for the clusterrulenamespacerequiredlabels API
       properties:
         apiVersion:
-          description: 'APIVersion defines the versioned schema of this representation
-            of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
           type: string
         kind:
-          description: 'Kind is a string value representing the REST resource this
-            object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
           type: string
         metadata:
           type: object
         spec:
-          description: ClusterRuleNamespaceRequiredLabelSpec defines the desired state
-            of ClusterRuleNamespaceRequiredLabel
+          description: ClusterRuleNamespaceRequiredLabelSpec defines the desired state of ClusterRuleNamespaceRequiredLabel
           properties:
             ignoreNamespaces:
-              description: IgnoreNamespaces is the list of namespaces to ignore for
-                this rule
+              description: IgnoreNamespaces is the list of namespaces to ignore for this rule
               items:
                 type: string
               type: array
             label:
-              description: Label is the required label for this namespace, specified
-                key, value, and a match
+              description: Label is the required label for this namespace, specified key, value, and a match
               properties:
                 key:
                   description: Key is the label key name
                   type: string
                 match:
-                  description: Match is the way of matching, default to "exact" match,
-                    can also use "regexp" and set value to a regular express for matching.
+                  description: Match is the way of matching, default to "exact" match, can also use "regexp" and set value to a regular express for matching.
                   type: string
                 value:
-                  description: Value is the label value, when match is set as "regexp",
-                    the acceptable syntax of regex is RE2 (https://github.com/google/re2/wiki/Syntax)
+                  description: Value is the label value, when match is set as "regexp", the acceptable syntax of regex is RE2 (https://github.com/google/re2/wiki/Syntax)
                   type: string
               required:
               - key
               - value
               type: object
             notification:
-              description: Notification contains the channels and messages to send
-                out to external system, such as slack or pagerduty.
+              description: Notification contains the channels and messages to send out to external system, such as slack or pagerduty.
               properties:
                 customMessageTemplate:
-                  description: CustomMessageTemplate can used for customized message,
-                    variables can be used are "ResourceName, Severity, and Message"
+                  description: CustomMessageTemplate can used for customized message, variables can be used are "ResourceName, Severity, and Message"
                   type: string
                 notifiers:
-                  description: Notifiers is the list of notifiers for this notification
-                    to send
+                  description: Notifiers is the list of notifiers for this notification to send
                   items:
                     type: string
                   type: array
                 severity:
-                  description: Severity is the severity of the issue, one of info,
-                    warning, critical, or fatal
+                  description: Severity is the severity of the issue, one of info, warning, critical, or fatal
                   type: string
                 suppressed:
-                  description: Suppressed means if this notification has been suppressed,
-                    used for temporary reduced the noise
+                  description: Suppressed means if this notification has been suppressed, used for temporary reduced the noise
                   type: boolean
               required:
               - notifiers

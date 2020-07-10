@@ -4,7 +4,7 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.2.9
+    controller-gen.kubebuilder.io/version: v0.3.0
   creationTimestamp: null
   name: clusterrulepdbminalloweddisruptions.merlin.mercari.com
 spec:
@@ -17,56 +17,43 @@ spec:
   scope: Cluster
   validation:
     openAPIV3Schema:
-      description: ClusterRulePDBMinAllowedDisruption is the Schema for the clusterrulepdbminalloweddisruptions
-        API
+      description: ClusterRulePDBMinAllowedDisruption is the Schema for the clusterrulepdbminalloweddisruptions API
       properties:
         apiVersion:
-          description: 'APIVersion defines the versioned schema of this representation
-            of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
           type: string
         kind:
-          description: 'Kind is a string value representing the REST resource this
-            object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
           type: string
         metadata:
           type: object
         spec:
-          description: ClusterRulePDBMinAllowedDisruptionSpec defines the desired
-            state of ClusterRulePDBMinAllowedDisruption
+          description: ClusterRulePDBMinAllowedDisruptionSpec defines the desired state of ClusterRulePDBMinAllowedDisruption
           properties:
             ignoreNamespaces:
-              description: IgnoreNamespaces is the list of namespaces to ignore for
-                this rule
+              description: IgnoreNamespaces is the list of namespaces to ignore for this rule
               items:
                 type: string
               type: array
             minAllowedDisruption:
-              description: MinAllowedDisruption is the minimal allowed disruption
-                for this rule, should be an integer, default to 1
+              description: MinAllowedDisruption is the minimal allowed disruption for this rule, should be an integer, default to 1
               type: integer
             notification:
-              description: Notification contains the channels and messages to send
-                out to external system, such as slack or pagerduty.
+              description: Notification contains the channels and messages to send out to external system, such as slack or pagerduty.
               properties:
                 customMessageTemplate:
-                  description: CustomMessageTemplate can used for customized message,
-                    variables can be used are "ResourceName, Severity, and Message"
+                  description: CustomMessageTemplate can used for customized message, variables can be used are "ResourceName, Severity, and Message"
                   type: string
                 notifiers:
-                  description: Notifiers is the list of notifiers for this notification
-                    to send
+                  description: Notifiers is the list of notifiers for this notification to send
                   items:
                     type: string
                   type: array
                 severity:
-                  description: Severity is the severity of the issue, one of info,
-                    warning, critical, or fatal
+                  description: Severity is the severity of the issue, one of info, warning, critical, or fatal
                   type: string
                 suppressed:
-                  description: Suppressed means if this notification has been suppressed,
-                    used for temporary reduced the noise
+                  description: Suppressed means if this notification has been suppressed, used for temporary reduced the noise
                   type: boolean
               required:
               - notifiers
