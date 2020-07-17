@@ -1,0 +1,15 @@
+apiVersion: merlin.mercari.com/v1beta1
+kind: ClusterRuleConfigMapUnused
+metadata:
+  name: clusterruleconfigmapunused-sample
+spec:
+  ignoreNamespaces:
+    - istio-system
+    - kube-system
+    - test
+  notification:
+    notifiers:
+      - slack-test
+    suppressed: false
+    severity: info
+  initialDelaySeconds: 600 # initial wait time before it start to check

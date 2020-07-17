@@ -40,4 +40,7 @@ resources:
 - group: merlin
   kind: ClusterRuleSecretUnused
   version: v1
+- group: merlin
+  kind: ClusterRuleConfigMapUnused
+  version: v1beta1
 version: "2"

@@ -1,0 +1,26 @@
+# permissions to do edit clusterruleconfigmapunuseds.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: clusterruleconfigmapunused-editor-role
+rules:
+- apiGroups:
+  - merlin.mercari.com
+  resources:
+  - clusterruleconfigmapunuseds
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - merlin.mercari.com
+  resources:
+  - clusterruleconfigmapunuseds/status
+  verbs:
+  - get
+  - patch
+  - update

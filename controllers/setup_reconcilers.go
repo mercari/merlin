@@ -29,6 +29,7 @@ func SetupReconcilers(mgr manager.Manager) error {
 	}
 
 	secretUnusedRule := &rules.Cache{}
+	configMapUnusedRule := &rules.Cache{}
 	hpaInvalidScaleTargetRefRule := &rules.Cache{}
 	hpaReplicaPercentageRules := &rules.Cache{}
 	namespaceRequiredLabelRules := &rules.Cache{}
@@ -45,7 +46,7 @@ func SetupReconcilers(mgr manager.Manager) error {
 			scheme:        mgr.GetScheme(),
 			notifierCache: notifierReconciler.cache,
 			resource:      &corev1.Pod{},
-			rules:         []*rules.Cache{secretUnusedRule},
+			rules:         []*rules.Cache{secretUnusedRule, configMapUnusedRule},
 		},
 	}).SetupWithManager(mgr, func(rawObj runtime.Object) []string {
 		obj := rawObj.(*corev1.Pod)
@@ -141,6 +142,22 @@ func SetupReconcilers(mgr manager.Manager) error {
 		return err
 	}
 
+	if err := (&ConfigMapReconciler{
+		ResourceReconciler{
+			Client:        mgr.GetClient(),
+			log:           ctrl.Log.WithName("ConfigMap"),
+			scheme:        mgr.GetScheme(),
+			notifierCache: notifierReconciler.cache,
+			resource:      &corev1.ConfigMap{},
+			rules:         []*rules.Cache{configMapUnusedRule},
+		},
+	}).SetupWithManager(mgr, func(rawObj runtime.Object) []string {
+		obj := rawObj.(*corev1.ConfigMap)
+		return []string{obj.Name}
+	}); err != nil {
+		return err
+	}
+
 	//// Rule Reconcilers ////
 
 	if err := (&SecretUnusedRuleReconciler{
@@ -157,6 +174,25 @@ func SetupReconcilers(mgr manager.Manager) error {
 		nil,
 		func(rawObj runtime.Object) []string {
 			obj := rawObj.(*merlinv1beta1.ClusterRuleSecretUnused)
+			return []string{obj.ObjectMeta.Name}
+		}); err != nil {
+		return err
+	}
+
+	if err := (&ConfigMapUnusedRuleReconciler{
+		RuleReconciler{
+			Client:        mgr.GetClient(),
+			log:           ctrl.Log.WithName("ConfigMapUnusedRule"),
+			scheme:        mgr.GetScheme(),
+			notifierCache: notifierReconciler.cache,
+			rules:         secretUnusedRule,
+			ruleFactory:   &rules.SecretUnusedRule{},
+		},
+	}).SetupWithManager(mgr,
+		&merlinv1beta1.ClusterRuleConfigMapUnused{},
+		nil,
+		func(rawObj runtime.Object) []string {
+			obj := rawObj.(*merlinv1beta1.ClusterRuleConfigMapUnused)
 			return []string{obj.ObjectMeta.Name}
 		}); err != nil {
 		return err
