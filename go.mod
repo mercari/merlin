@@ -10,6 +10,7 @@ require (
 	github.com/golang/mock v1.4.3
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.8.1
+	github.com/prometheus/client_golang v1.0.0
 	github.com/stretchr/testify v1.5.1
 	go.uber.org/zap v1.10.0
 	golang.org/x/tools v0.0.0-20200416040550-9c19d0db369a // indirect

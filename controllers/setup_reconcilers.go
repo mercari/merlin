@@ -1,8 +1,12 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -37,6 +41,15 @@ func SetupReconcilers(mgr manager.Manager) error {
 	pdbInvalidSelectorRules := &rules.Cache{}
 	pdbMinAllowedDisruptionRules := &rules.Cache{}
 
+	violationMetrics := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: fmt.Sprintf("merlin_violation"),
+			Help: "Merlin - indicates if a resource has violated cluster rule (gauge)",
+		},
+		[]string{"rule", "rule_name", "resource_name", "resource_namespace", "kind"},
+	)
+	metrics.Registry.MustRegister(violationMetrics)
+
 	//// resource Reconcilers ////
 
 	if err := (&PodReconciler{
@@ -48,7 +61,7 @@ func SetupReconcilers(mgr manager.Manager) error {
 			resource:      &corev1.Pod{},
 			rules:         []*rules.Cache{secretUnusedRule, configMapUnusedRule},
 		},
-	}).SetupWithManager(mgr, func(rawObj runtime.Object) []string {
+	}).SetupWithManager(mgr, violationMetrics, func(rawObj runtime.Object) []string {
 		obj := rawObj.(*corev1.Pod)
 		return []string{obj.Name}
 	}); err != nil {
@@ -68,6 +81,7 @@ func SetupReconcilers(mgr manager.Manager) error {
 			},
 		},
 	}).SetupWithManager(mgr,
+		violationMetrics,
 		func(rawObj runtime.Object) []string {
 			obj := rawObj.(*autoscalingv1.HorizontalPodAutoscaler)
 			return []string{obj.Name}
@@ -84,7 +98,7 @@ func SetupReconcilers(mgr manager.Manager) error {
 			resource:      &corev1.Namespace{},
 			rules:         []*rules.Cache{namespaceRequiredLabelRules},
 		},
-	}).SetupWithManager(mgr, func(rawObj runtime.Object) []string {
+	}).SetupWithManager(mgr, violationMetrics, func(rawObj runtime.Object) []string {
 		obj := rawObj.(*corev1.Namespace)
 		return []string{obj.Name}
 	}); err != nil {
@@ -103,7 +117,7 @@ func SetupReconcilers(mgr manager.Manager) error {
 				pdbInvalidSelectorRules,
 			},
 		},
-	}).SetupWithManager(mgr, func(rawObj runtime.Object) []string {
+	}).SetupWithManager(mgr, violationMetrics, func(rawObj runtime.Object) []string {
 		obj := rawObj.(*policyv1beta1.PodDisruptionBudget)
 		return []string{obj.Name}
 	}); err != nil {
@@ -119,7 +133,7 @@ func SetupReconcilers(mgr manager.Manager) error {
 			resource:      &corev1.Service{},
 			rules:         []*rules.Cache{serviceInvalidSelectorRules},
 		},
-	}).SetupWithManager(mgr, func(rawObj runtime.Object) []string {
+	}).SetupWithManager(mgr, violationMetrics, func(rawObj runtime.Object) []string {
 		obj := rawObj.(*corev1.Service)
 		return []string{obj.Name}
 	}); err != nil {
@@ -135,7 +149,7 @@ func SetupReconcilers(mgr manager.Manager) error {
 			resource:      &corev1.Secret{},
 			rules:         []*rules.Cache{secretUnusedRule},
 		},
-	}).SetupWithManager(mgr, func(rawObj runtime.Object) []string {
+	}).SetupWithManager(mgr, violationMetrics, func(rawObj runtime.Object) []string {
 		obj := rawObj.(*corev1.Secret)
 		return []string{obj.Name}
 	}); err != nil {
@@ -151,7 +165,7 @@ func SetupReconcilers(mgr manager.Manager) error {
 			resource:      &corev1.ConfigMap{},
 			rules:         []*rules.Cache{configMapUnusedRule},
 		},
-	}).SetupWithManager(mgr, func(rawObj runtime.Object) []string {
+	}).SetupWithManager(mgr, violationMetrics, func(rawObj runtime.Object) []string {
 		obj := rawObj.(*corev1.ConfigMap)
 		return []string{obj.Name}
 	}); err != nil {
@@ -170,6 +184,7 @@ func SetupReconcilers(mgr manager.Manager) error {
 			ruleFactory:   &rules.SecretUnusedRule{},
 		},
 	}).SetupWithManager(mgr,
+		violationMetrics,
 		&merlinv1beta1.ClusterRuleSecretUnused{},
 		nil,
 		func(rawObj runtime.Object) []string {
@@ -189,6 +204,7 @@ func SetupReconcilers(mgr manager.Manager) error {
 			ruleFactory:   &rules.SecretUnusedRule{},
 		},
 	}).SetupWithManager(mgr,
+		violationMetrics,
 		&merlinv1beta1.ClusterRuleConfigMapUnused{},
 		nil,
 		func(rawObj runtime.Object) []string {
@@ -208,6 +224,7 @@ func SetupReconcilers(mgr manager.Manager) error {
 			ruleFactory:   &rules.HPAReplicaPercentageRule{},
 		},
 	}).SetupWithManager(mgr,
+		violationMetrics,
 		&merlinv1beta1.ClusterRuleHPAReplicaPercentage{},
 		&merlinv1beta1.RuleHPAReplicaPercentage{},
 		func(rawObj runtime.Object) []string {
@@ -231,6 +248,7 @@ func SetupReconcilers(mgr manager.Manager) error {
 			ruleFactory:   &rules.HPAInvalidScaleTargetRefRule{},
 		},
 	}).SetupWithManager(mgr,
+		violationMetrics,
 		&merlinv1beta1.ClusterRuleHPAInvalidScaleTargetRef{},
 		nil,
 		func(rawObj runtime.Object) []string {
@@ -250,6 +268,7 @@ func SetupReconcilers(mgr manager.Manager) error {
 			ruleFactory:   &rules.NamespaceRequiredLabelRule{},
 		},
 	}).SetupWithManager(mgr,
+		violationMetrics,
 		&merlinv1beta1.ClusterRuleNamespaceRequiredLabel{},
 		nil,
 		func(rawObj runtime.Object) []string {
@@ -269,6 +288,7 @@ func SetupReconcilers(mgr manager.Manager) error {
 			ruleFactory:   &rules.ServiceInvalidSelectorRule{},
 		},
 	}).SetupWithManager(mgr,
+		violationMetrics,
 		&merlinv1beta1.ClusterRuleServiceInvalidSelector{},
 		nil,
 		func(rawObj runtime.Object) []string {
@@ -288,6 +308,7 @@ func SetupReconcilers(mgr manager.Manager) error {
 			ruleFactory:   &rules.PDBInvalidSelectorRule{},
 		},
 	}).SetupWithManager(mgr,
+		violationMetrics,
 		&merlinv1beta1.ClusterRulePDBInvalidSelector{},
 		nil,
 		func(rawObj runtime.Object) []string {
@@ -307,6 +328,7 @@ func SetupReconcilers(mgr manager.Manager) error {
 			ruleFactory:   &rules.PDBMinAllowedDisruptionRule{},
 		},
 	}).SetupWithManager(mgr,
+		violationMetrics,
 		&merlinv1beta1.ClusterRulePDBMinAllowedDisruption{},
 		&merlinv1beta1.RulePDBMinAllowedDisruption{},
 		func(rawObj runtime.Object) []string {

@@ -2,7 +2,10 @@ package controllers
 
 import (
 	"context"
+	"strings"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/go-logr/logr"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -25,6 +28,8 @@ type ResourceReconciler struct {
 	rules []*rules.Cache
 	// resource is the kubernetes resource type that the controller watches.
 	resource runtime.Object
+	// violationMetrics
+	violationMetrics *prometheus.GaugeVec
 }
 
 func (r *ResourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
@@ -77,6 +82,19 @@ func (r *ResourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		if err != nil {
 			return ctrl.Result{RequeueAfter: requeueIntervalForError()}, err
 		}
+		ruleName := strings.Split(rule.GetName(), "/")
+		promLabels := prometheus.Labels{
+			"rule":               ruleName[0],
+			"rule_name":          ruleName[1],
+			"resource_namespace": req.Namespace,
+			"resource_name":      req.Name,
+			"kind":               a.ResourceKind,
+		}
+		if a.Violated {
+			r.violationMetrics.With(promLabels).Set(1)
+		} else {
+			r.violationMetrics.With(promLabels).Set(0)
+		}
 		for _, n := range rule.GetNotification().Notifiers {
 			notifier, ok := r.notifierCache.Notifiers[n]
 			if !ok {
@@ -94,7 +112,7 @@ func (r *ResourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 
-func (r *ResourceReconciler) SetupWithManager(mgr ctrl.Manager, indexingFunc func(rawObj runtime.Object) []string) error {
+func (r *ResourceReconciler) SetupWithManager(mgr ctrl.Manager, violationMetrics *prometheus.GaugeVec, indexingFunc func(rawObj runtime.Object) []string) error {
 	ctx := context.Background()
 	l := r.log.WithName("SetupWithManager")
 	l.V(1).Info("getting field indexer for resource")
@@ -105,6 +123,7 @@ func (r *ResourceReconciler) SetupWithManager(mgr ctrl.Manager, indexingFunc fun
 		return err
 	}
 
+	r.violationMetrics = violationMetrics
 	l.Info("initialize manager", "rules", r.rules)
 	return ctrl.
 		NewControllerManagedBy(mgr).

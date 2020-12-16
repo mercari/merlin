@@ -2,11 +2,13 @@ package controllers
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/kouzoh/merlin/notifiers"
 	"github.com/kouzoh/merlin/rules"
+	"github.com/prometheus/client_golang/prometheus"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -27,6 +29,8 @@ type RuleReconciler struct {
 	rules *rules.Cache
 	// ruleFactory generates new rule when there's any rule change/update/delete events.
 	ruleFactory rules.RuleFactory
+	// violationMetrics
+	violationMetrics *prometheus.GaugeVec
 }
 
 func (r *RuleReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
@@ -97,6 +101,20 @@ func (r *RuleReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		for _, a := range alerts {
 			l.V(1).Info("Setting alerts to notifier", "alert", a)
 			notifier.SetAlert(rule.GetName(), a)
+			resource := strings.Split(a.ResourceName, "/")
+			ruleName := strings.Split(rule.GetName(), "/")
+			promLabels := prometheus.Labels{
+				"rule":               ruleName[0],
+				"rule_name":          ruleName[1],
+				"resource_namespace": resource[0],
+				"resource_name":      resource[1],
+				"kind":               a.ResourceKind,
+			}
+			if a.Violated {
+				r.violationMetrics.With(promLabels).Set(1)
+			} else {
+				r.violationMetrics.With(promLabels).Set(0)
+			}
 		}
 	}
 
@@ -104,7 +122,7 @@ func (r *RuleReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 
-func (r *RuleReconciler) SetupWithManager(mgr ctrl.Manager, clusterRule, namespaceRule runtime.Object, indexingFunc func(rawObj runtime.Object) []string) error {
+func (r *RuleReconciler) SetupWithManager(mgr ctrl.Manager, violationMetrics *prometheus.GaugeVec, clusterRule, namespaceRule runtime.Object, indexingFunc func(rawObj runtime.Object) []string) error {
 	ctx := context.Background()
 	l := r.log.WithName("SetupWithManager")
 
@@ -124,6 +142,7 @@ func (r *RuleReconciler) SetupWithManager(mgr ctrl.Manager, clusterRule, namespa
 		}
 		builder.Watches(&source.Kind{Type: namespaceRule}, &EventHandler{Log: l})
 	}
+	r.violationMetrics = violationMetrics
 
 	l.Info("initialize manager", "cluster rule", clusterRule, "namespaced rule", namespaceRule)
 
