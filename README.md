@@ -1,7 +1,5 @@
 # Merlin
 
-[![CircleCI](https://circleci.com/gh/kouzoh/merlin.svg?style=svg&circle-token=5c9140edab4f649c6f3585fde235e63e093dd791)](https://circleci.com/gh/kouzoh/merlin)
-
 An agent that sends out alerts when kubernetes resources are misconfigured or have issues based on rules.
 
 ## Technical background and designs
