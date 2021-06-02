@@ -27,7 +27,7 @@ var _ = Describe("NamespaceControllerTests", func() {
 		const kubeSystemNamespace = "kube-system"
 		var ruleStructName = GetStructName(merlinv1beta1.ClusterRuleNamespaceRequiredLabel{})
 		var notifier = &merlinv1beta1.Notifier{
-			ObjectMeta: metav1.ObjectMeta{Name: strings.ToLower(ruleStructName) + "-notifier"},
+			ObjectMeta: metav1.ObjectMeta{Name: strings.ToLower(ruleStructName) + "-notifiers"},
 			Spec:       merlinv1beta1.NotifierSpec{NotifyInterval: 1},
 		}
 		var rule = &merlinv1beta1.ClusterRuleNamespaceRequiredLabel{
@@ -57,7 +57,7 @@ var _ = Describe("NamespaceControllerTests", func() {
 			if !isNotifierCreated {
 				Expect(k8sClient.Create(ctx, notifier)).Should(Succeed())
 				Eventually(func() map[string]*notifiers.Notifier {
-					return notifierReconciler.cache.Notifiers
+					return notifierReconciler.cache.notifiers
 				}, time.Second*5, time.Millisecond*200).Should(HaveKey(notifier.Name))
 			}
 			isNotifierCreated = true
@@ -89,31 +89,31 @@ var _ = Describe("NamespaceControllerTests", func() {
 			Expect(rule.Name).To(Equal(rule.Name))
 			Expect(rule.Spec.Notification.Notifiers[0]).To(Equal(notifier.Name))
 
-			By("Alert should be added to notifier status")
+			By("Alert should be added to notifiers status")
 			Eventually(func() map[string]alert.Alert {
 				n := &merlinv1beta1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).Should(HaveKey(alertKey))
-			Expect(notifierReconciler.cache.Notifiers[notifier.Name].Resource.Status.Alerts).Should(HaveKey(alertKey))
+			Expect(notifierReconciler.cache.notifiers[notifier.Name].Resource.Status.Alerts).Should(HaveKey(alertKey))
 
 			By("Ignored Namespace should not have alert")
 			ignoredAlertKey := strings.Join([]string{ruleStructName, rule.Name, "", kubeSystemNamespace}, Separator)
 			n := &merlinv1beta1.Notifier{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 			Expect(n.Status.Alerts).ShouldNot(HaveKey(ignoredAlertKey))
-			Expect(notifierReconciler.cache.Notifiers[notifier.Name].Resource.Status.Alerts).ShouldNot(HaveKey(ignoredAlertKey))
+			Expect(notifierReconciler.cache.notifiers[notifier.Name].Resource.Status.Alerts).ShouldNot(HaveKey(ignoredAlertKey))
 		})
 
 		It("TestRemoveRuleShouldRemoveViolation", func() {
 			Expect(k8sClient.Delete(ctx, rule)).Should(Succeed())
-			// alert should be removed from notifier status
+			// alert should be removed from notifiers status
 			Eventually(func() map[string]alert.Alert {
 				n := &merlinv1beta1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).ShouldNot(HaveKey(alertKey))
-			Expect(notifierReconciler.cache.Notifiers[notifier.Name].Resource.Status.Alerts).ShouldNot(HaveKey(alertKey))
+			Expect(notifierReconciler.cache.notifiers[notifier.Name].Resource.Status.Alerts).ShouldNot(HaveKey(alertKey))
 		})
 
 		It("TestRecreateRuleShouldGetViolationsForExistingNamespace", func() {
@@ -122,13 +122,13 @@ var _ = Describe("NamespaceControllerTests", func() {
 			alertKey := strings.Join([]string{ruleStructName, rule.Name, namespacedName.String()}, Separator)
 			Expect(k8sClient.Create(ctx, rule)).Should(Succeed(), "Failed to recreate rule")
 
-			By("Alert should be added to notifier status")
+			By("Alert should be added to notifiers status")
 			Eventually(func() map[string]alert.Alert {
 				n := &merlinv1beta1.Notifier{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "", Name: notifier.Name}, n)).Should(Succeed())
 				return n.Status.Alerts
 			}, time.Second*5, time.Millisecond*200).Should(HaveKey(alertKey))
-			Expect(notifierReconciler.cache.Notifiers[notifier.Name].Resource.Status.Alerts).Should(HaveKey(alertKey))
+			Expect(notifierReconciler.cache.notifiers[notifier.Name].Resource.Status.Alerts).Should(HaveKey(alertKey))
 		})
 	})
 })

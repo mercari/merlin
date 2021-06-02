@@ -2,67 +2,57 @@ package controllers
 
 import (
 	"context"
-	"strings"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/go-logr/logr"
+	"github.com/kouzoh/merlin/rules"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/kouzoh/merlin/notifiers"
-	"github.com/kouzoh/merlin/rules"
 )
 
 type ResourceReconciler struct {
 	client.Client
 	log    logr.Logger
 	scheme *runtime.Scheme
-	// notifierCache stores the notifiers as cache, this will be updated when any notifier updates happen,
+	// notifiers stores the notifiers as cache, this will be updated when any notifiers updates happen,
 	// and also serves as cache so we dont need to get list of notifiers every time
-	notifierCache *notifiers.Cache
+	notifiers *notifiersCache
 	// rules is the list of rules cached to apply for this reconciler
-	rules []*rules.Cache
+	rules []*rulesCache
 	// resource is the kubernetes resource type that the controller watches.
 	resource runtime.Object
-	// violationMetrics
-	violationMetrics *prometheus.GaugeVec
 }
 
 func (r *ResourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	l := r.log.WithName("Reconcile").WithValues("req", req.NamespacedName)
-	if !r.notifierCache.IsReady {
-		l.V(1).Info("Notifier is not ready")
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	l := r.log.WithName("ResourceReconciler").WithValues("resource", req.NamespacedName)
+	if !r.notifiers.isReady {
+		l.V(1).Info("Notifiers are not ready, requeue the request")
+		return ctrl.Result{RequeueAfter: requeueMinInternalSeconds * time.Second}, nil
 	}
 
 	l.Info("reconciling")
 	object := r.resource.DeepCopyObject()
 	if err := r.Get(ctx, req.NamespacedName, object); err != nil {
 		if apierrs.IsNotFound(err) {
-			l.Info("resource is deleted, clear alerts")
-			for _, notifier := range r.notifierCache.Notifiers {
-				l.V(1).Info("removing alert from notifier", "notifier", notifier.Resource.Name)
-				notifier.ClearResourceAlerts(req.NamespacedName.String(), "recover alert since resource is deleted")
-				return ctrl.Result{}, nil
-			}
+			msg := "recover alert since resource is deleted"
+			l.Info(msg)
+			r.notifiers.ClearResourceAlerts(req.NamespacedName.String(), msg)
 			return ctrl.Result{}, nil
 		}
 		l.Error(err, "unable to retrieve the object")
 		return ctrl.Result{RequeueAfter: requeueIntervalForError()}, err
 	}
-	var rulesToApply []rules.Rule
 
-	for _, rulePool := range r.rules {
-		if namespaceRules, ok := rulePool.LoadNamespaced(req.Namespace); ok {
+	var rulesToApply []rules.Rule
+	for _, ruleCache := range r.rules {
+		if namespaceRules, ok := ruleCache.LoadNamespaced(req.Namespace); ok {
 			for _, namespaceRule := range namespaceRules {
 				rulesToApply = append(rulesToApply, namespaceRule)
 			}
-		} else if clusterRules, ok := rulePool.LoadNamespaced(""); ok {
+		} else if clusterRules, ok := ruleCache.LoadNamespaced(""); ok {
 			for _, clusterRule := range clusterRules {
 				rulesToApply = append(rulesToApply, clusterRule)
 			}
@@ -73,7 +63,7 @@ func (r *ResourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	for _, rule := range rulesToApply {
 		if !rule.IsReady() {
 			// skip the rule if it's not ready, maybe being created or updated
-			l.V(1).Info("rule is not ready, skipping", "rule", rule.GetName())
+			l.Info("rule is not ready, skipping", "rule", rule.GetName())
 			allRulesAreReady = false
 			continue
 		}
@@ -82,28 +72,7 @@ func (r *ResourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		if err != nil {
 			return ctrl.Result{RequeueAfter: requeueIntervalForError()}, err
 		}
-		ruleName := strings.Split(rule.GetName(), "/")
-		promLabels := prometheus.Labels{
-			"rule":               ruleName[0],
-			"rule_name":          ruleName[1],
-			"resource_namespace": req.Namespace,
-			"resource_name":      req.Name,
-			"kind":               a.ResourceKind,
-		}
-		if a.Violated {
-			r.violationMetrics.With(promLabels).Set(1)
-		} else {
-			r.violationMetrics.With(promLabels).Set(0)
-		}
-		for _, n := range rule.GetNotification().Notifiers {
-			notifier, ok := r.notifierCache.Notifiers[n]
-			if !ok {
-				l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
-				continue
-			}
-			l.V(1).Info("Setting alerts to notifier", "alert", a, "notifier", n)
-			notifier.SetAlert(rule.GetName(), a)
-		}
+		r.notifiers.SetAlert(rule, a)
 	}
 	if !allRulesAreReady {
 		l.V(1).Info("some rules were not evaluated, requeue request")
@@ -112,7 +81,7 @@ func (r *ResourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 
-func (r *ResourceReconciler) SetupWithManager(mgr ctrl.Manager, violationMetrics *prometheus.GaugeVec, indexingFunc func(rawObj runtime.Object) []string) error {
+func (r *ResourceReconciler) SetupWithManager(mgr ctrl.Manager, indexingFunc func(rawObj runtime.Object) []string) error {
 	ctx := context.Background()
 	l := r.log.WithName("SetupWithManager")
 	l.V(1).Info("getting field indexer for resource")
@@ -123,7 +92,6 @@ func (r *ResourceReconciler) SetupWithManager(mgr ctrl.Manager, violationMetrics
 		return err
 	}
 
-	r.violationMetrics = violationMetrics
 	l.Info("initialize manager", "rules", r.rules)
 	return ctrl.
 		NewControllerManagedBy(mgr).

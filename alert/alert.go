@@ -13,7 +13,10 @@ const (
 	MessageTemplateVariableResourceName = "{{.ResourceName}}"
 	MessageTemplateVariableMessage      = "{{.Message}}"
 
-	DefaultMessageTemplate = "[" + MessageTemplateVariableSeverity + "] " + MessageTemplateVariableResourceKind + " `" + MessageTemplateVariableResourceName + "` " + MessageTemplateVariableMessage
+	DefaultMessageTemplate = "[" + MessageTemplateVariableSeverity + "] " +
+		MessageTemplateVariableResourceKind +
+		" `" + MessageTemplateVariableResourceName + "` " +
+		MessageTemplateVariableMessage
 
 	StatusPending    Status = "pending"    // pending to send alert
 	StatusFiring     Status = "firing"     // alert currently firing

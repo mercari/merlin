@@ -3,6 +3,9 @@
 IMG ?= gcr.io/mercari-us-double/merlin:latest
 CRD_OPTIONS ?= "crd:crdVersions=v1"
 
+GOFILES := $(shell find . -name "*.go" -type f -not -path "./vendor/*")
+GOIMPORTS ?= goimports
+
 # Sample configs
 SAMPLE_DIR := config/samples
 SAMPLE_COFIGS := $(shell ls -d $(SAMPLE_DIR))
@@ -91,3 +94,16 @@ CONTROLLER_GEN=$(GOBIN)/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
+
+.PHONY: fmt-check
+fmt-check:
+	@diff=$$($(GOIMPORTS) -d $(GOFILES)); \
+	if [ -n "$$diff" ]; then \
+		echo "Please run 'make fmt' and commit the result:"; \
+		echo "$${diff}"; \
+		exit 1; \
+	fi;
+
+.PHONY: fmt
+fmt:
+	$(GOIMPORTS) -w $(GOFILES)

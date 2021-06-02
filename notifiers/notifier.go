@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/kouzoh/merlin/alert"
 	"github.com/kouzoh/merlin/alert/slack"
 	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
@@ -12,14 +14,10 @@ import (
 
 const Separator = merlinv1beta1.Separator
 
-type Cache struct {
-	Notifiers map[string]*Notifier
-	IsReady   bool
-}
-
 type Notifier struct {
-	Resource *merlinv1beta1.Notifier
-	Client   *http.Client
+	Resource     *merlinv1beta1.Notifier
+	Client       *http.Client
+	AlertMetrics *prometheus.GaugeVec
 }
 
 func (n *Notifier) Notify() {
@@ -30,8 +28,7 @@ func (n *Notifier) Notify() {
 		if a.Status != alert.StatusFiring { // wont send again if already firing
 			if n.Resource.Spec.Slack.Channel != "" {
 				slackClient := slack.NewClient(n.Client, n.Resource.Spec.Slack.Severity, n.Resource.Spec.Slack.WebhookURL, n.Resource.Spec.Slack.Channel)
-				err := slackClient.SendAlert(a)
-				if err != nil {
+				if err := slackClient.SendAlert(a); err != nil {
 					a.Error = err.Error()
 				} else {
 					a.Error = ""
@@ -50,6 +47,7 @@ func (n *Notifier) Notify() {
 		} else {
 			n.Resource.Status.Alerts[name] = a
 		}
+		n.setPromLabel(name, a)
 	}
 	n.Resource.Status.CheckedAt = time.Now().Format(time.RFC3339)
 }
@@ -115,6 +113,25 @@ func (n *Notifier) ClearResourceAlerts(resource, message string) {
 	return
 }
 
+func (n *Notifier) setPromLabel(alertName string, a alert.Alert) {
+	names := strings.Split(alertName, Separator)
+	if len(names) == 4 {
+		label := prometheus.Labels{
+			"rule":               names[0],
+			"rule_name":          names[1],
+			"resource_namespace": names[2],
+			"resource_name":      names[3],
+			"resource_kind":      a.ResourceKind,
+		}
+		if a.Violated {
+			n.AlertMetrics.With(label).Set(1)
+		} else {
+			n.AlertMetrics.With(label).Set(0)
+		}
+	}
+}
+
+// alert example: <Rule>/<RuleName>/<ResourceNamespace>/<ResourceName>
 func getAlertName(rule, resourceName string) string {
 	return strings.Join([]string{rule, resourceName}, Separator)
 }

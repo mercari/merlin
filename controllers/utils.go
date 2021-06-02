@@ -8,10 +8,12 @@ import (
 )
 
 const (
-	metadataNameField = ".metadata.name"
+	metadataNameField         = ".metadata.name"
+	requeueMinInternalSeconds = 10
+	requeueMaxInternalSeconds = 30
 )
 
-var NotifierNotFoundErr = fmt.Errorf("notifier not found")
+var NotifierNotFoundErr = fmt.Errorf("notifiers not found")
 
 func GetStructName(v interface{}) string {
 	if t := reflect.TypeOf(v); t.Kind() == reflect.Ptr {
@@ -33,7 +35,5 @@ func containsString(slice []string, s string) bool {
 
 func requeueIntervalForError() time.Duration {
 	rand.Seed(time.Now().UnixNano())
-	min := 10
-	max := 30
-	return time.Duration(rand.Intn(max-min+1)+min) * time.Second
+	return time.Duration(rand.Intn(requeueMaxInternalSeconds-requeueMinInternalSeconds+1)+requeueMinInternalSeconds) * time.Second
 }

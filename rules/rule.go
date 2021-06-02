@@ -57,7 +57,7 @@ func (r *Status) getViolations(namespace string) map[string]time.Time {
 	return violations
 }
 
-// RuleFactory is the factory that creates
+// RuleFactory is the factory that creates rule
 type RuleFactory interface {
 	New(context.Context, client.Client, logr.Logger, client.ObjectKey) (Rule, error)
 }
@@ -105,43 +105,6 @@ func (r *rule) IsReady() bool {
 // SetReady sets the readiness of the rule.
 func (r *rule) SetReady(isReady bool) {
 	r.isReady = isReady
-}
-
-type Cache struct {
-	sync.Mutex
-	rules map[string]map[string]Rule
-}
-
-func (c *Cache) Load(namespace, name string) Rule {
-	c.Lock()
-	ru := c.rules[namespace][name]
-	c.Unlock()
-	return ru
-}
-
-func (c *Cache) LoadNamespaced(namespace string) (map[string]Rule, bool) {
-	c.Lock()
-	rs, ok := c.rules[namespace]
-	c.Unlock()
-	return rs, ok
-}
-
-func (c *Cache) Save(namespace, name string, rule Rule) {
-	c.Lock()
-	if c.rules == nil {
-		c.rules = map[string]map[string]Rule{}
-	}
-	if _, ok := c.rules[namespace]; !ok {
-		c.rules[namespace] = map[string]Rule{}
-	}
-	c.rules[namespace][name] = rule
-	c.Unlock()
-}
-
-func (c *Cache) Delete(namespace, name string) {
-	c.Lock()
-	delete(c.rules[namespace], name)
-	c.Unlock()
 }
 
 // removeString removes a string from a slice of string

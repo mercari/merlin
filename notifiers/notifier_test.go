@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/kouzoh/merlin/alert"
@@ -32,9 +33,17 @@ func Test_Notifier(t *testing.T) {
 		},
 		Status: merlinv1beta1.NotifierStatus{Alerts: map[string]alert.Alert{}},
 	}
+	promMetrics := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: fmt.Sprintf("merlin_violation"),
+			Help: "Merlin - indicates if a resource has violated cluster rule (gauge)",
+		},
+		[]string{"rule", "rule_name", "resource_name", "resource_namespace", "resource_kind"},
+	)
 	notifier := Notifier{
-		Resource: notifierResource,
-		Client:   &http.Client{Timeout: 10 * time.Second},
+		Resource:     notifierResource,
+		Client:       &http.Client{Timeout: 10 * time.Second},
+		AlertMetrics: promMetrics,
 	}
 	testAlertRuleAResourceA1 := alert.Alert{
 		Suppressed:   false,
@@ -46,10 +55,10 @@ func Test_Notifier(t *testing.T) {
 	}
 
 	// test setting alert and notify, status becomes firing
-	notifier.SetAlert("RuleA", testAlertRuleAResourceA1)
+	notifier.SetAlert("Rule/A", testAlertRuleAResourceA1)
 	notifier.Notify()
 	testAlertRuleAResourceA1.Status = alert.StatusFiring
-	assert.Equal(t, testAlertRuleAResourceA1, notifier.Resource.Status.Alerts["RuleA/test-resource/A1"])
+	assert.Equal(t, testAlertRuleAResourceA1, notifier.Resource.Status.Alerts["Rule/A/test-resource/A1"])
 
 	// test adding more alerts
 	testAlertRuleAResourceA2 := alert.Alert{
@@ -77,57 +86,57 @@ func Test_Notifier(t *testing.T) {
 		Violated:     true,
 	}
 
-	notifier.SetAlert("RuleA", testAlertRuleAResourceA2)
-	notifier.SetAlert("RuleB", testAlertRuleBResourceB)
-	notifier.SetAlert("RuleB", testAlertRuleBResourceC)
+	notifier.SetAlert("Rule/A", testAlertRuleAResourceA2)
+	notifier.SetAlert("Rule/B", testAlertRuleBResourceB)
+	notifier.SetAlert("Rule/B", testAlertRuleBResourceC)
 	testAlertRuleAResourceA2.Status = alert.StatusPending
 	testAlertRuleBResourceB.Status = alert.StatusPending
 	testAlertRuleBResourceC.Status = alert.StatusPending
-	assert.Equal(t, testAlertRuleAResourceA2, notifier.Resource.Status.Alerts["RuleA/test-resource/A2"])
+	assert.Equal(t, testAlertRuleAResourceA2, notifier.Resource.Status.Alerts["Rule/A/test-resource/A2"])
 
 	// test clear rule alerts should recover alerts for the rule
 	msg := "clear alerts for RuleA"
-	notifier.ClearRuleAlerts("RuleA", msg)
+	notifier.ClearRuleAlerts("Rule/A", msg)
 	testAlertRuleAResourceA1.Status = alert.StatusRecovering
 	testAlertRuleAResourceA2.Status = alert.StatusRecovering
 	testAlertRuleAResourceA1.Message = msg + " " + testAlertRuleAResourceA1.Message
 	testAlertRuleAResourceA2.Message = msg + " " + testAlertRuleAResourceA2.Message
-	assert.Equal(t, testAlertRuleAResourceA1, notifier.Resource.Status.Alerts["RuleA/test-resource/A1"])
-	assert.Equal(t, testAlertRuleAResourceA2, notifier.Resource.Status.Alerts["RuleA/test-resource/A2"])
-	assert.Equal(t, testAlertRuleBResourceB, notifier.Resource.Status.Alerts["RuleB/test-resource/B"])
-	assert.Equal(t, testAlertRuleBResourceC, notifier.Resource.Status.Alerts["RuleB/test-resource/C"])
+	assert.Equal(t, testAlertRuleAResourceA1, notifier.Resource.Status.Alerts["Rule/A/test-resource/A1"])
+	assert.Equal(t, testAlertRuleAResourceA2, notifier.Resource.Status.Alerts["Rule/A/test-resource/A2"])
+	assert.Equal(t, testAlertRuleBResourceB, notifier.Resource.Status.Alerts["Rule/B/test-resource/B"])
+	assert.Equal(t, testAlertRuleBResourceC, notifier.Resource.Status.Alerts["Rule/B/test-resource/C"])
 
 	// notify should send recovering alert and remove them, but will not remove other rules' alert
 	notifier.Notify()
-	assert.Empty(t, notifier.Resource.Status.Alerts["RuleA/test-resource/A1"])
-	assert.Empty(t, notifier.Resource.Status.Alerts["RuleA/test-resource/A2"])
+	assert.Empty(t, notifier.Resource.Status.Alerts["Rule/A/test-resource/A1"])
+	assert.Empty(t, notifier.Resource.Status.Alerts["Rule/A/test-resource/A2"])
 	testAlertRuleBResourceB.Status = alert.StatusFiring
 	testAlertRuleBResourceC.Status = alert.StatusFiring
-	assert.Equal(t, testAlertRuleBResourceB, notifier.Resource.Status.Alerts["RuleB/test-resource/B"])
-	assert.Equal(t, testAlertRuleBResourceC, notifier.Resource.Status.Alerts["RuleB/test-resource/C"])
+	assert.Equal(t, testAlertRuleBResourceB, notifier.Resource.Status.Alerts["Rule/B/test-resource/B"])
+	assert.Equal(t, testAlertRuleBResourceC, notifier.Resource.Status.Alerts["Rule/B/test-resource/C"])
 
 	// clear resource alerts should recover alerts for the resource
 	msg = "clear resource alerts"
 	notifier.ClearResourceAlerts("test-resource/B", msg)
 	testAlertRuleBResourceB.Status = alert.StatusRecovering
 	testAlertRuleBResourceB.Message = msg + " " + testAlertRuleBResourceB.Message
-	assert.Equal(t, testAlertRuleBResourceB, notifier.Resource.Status.Alerts["RuleB/test-resource/B"])
+	assert.Equal(t, testAlertRuleBResourceB, notifier.Resource.Status.Alerts["Rule/B/test-resource/B"])
 
 	// notify should send recovering alert and remove them, but will not remove other resources' alert
 	notifier.Notify()
-	assert.Empty(t, notifier.Resource.Status.Alerts["RuleB/test-resource/B"])
-	assert.Equal(t, testAlertRuleBResourceC, notifier.Resource.Status.Alerts["RuleB/test-resource/C"])
+	assert.Empty(t, notifier.Resource.Status.Alerts["Rule/B/test-resource/B"])
+	assert.Equal(t, testAlertRuleBResourceC, notifier.Resource.Status.Alerts["Rule/B/test-resource/C"])
 
 	// clear all alerts should recover all alerts
 	msg = "clear all alerts"
 	notifier.ClearAllAlerts(msg)
 	testAlertRuleBResourceC.Status = alert.StatusRecovering
 	testAlertRuleBResourceC.Message = msg + " " + testAlertRuleBResourceC.Message
-	assert.Equal(t, testAlertRuleBResourceC, notifier.Resource.Status.Alerts["RuleB/test-resource/C"])
+	assert.Equal(t, testAlertRuleBResourceC, notifier.Resource.Status.Alerts["Rule/B/test-resource/C"])
 
 	// notify should remove the last recovered alert.
 	notifier.Notify()
-	assert.Empty(t, notifier.Resource.Status.Alerts["RuleC/test-resource/C"])
+	assert.Empty(t, notifier.Resource.Status.Alerts["Rule/C/test-resource/C"])
 }
 
 func Test_getAlertName(t *testing.T) {

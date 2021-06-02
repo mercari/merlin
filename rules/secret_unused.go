@@ -169,7 +169,7 @@ func (s *SecretUnusedRule) evaluateSecret(ctx context.Context, secret *corev1.Se
 		return
 	}
 	for _, pod := range pods.Items {
-		s.log.Info("checking pod secrets", "pod", pod.Name)
+		s.log.V(1).Info("checking pod secrets", "pod", pod.Name)
 		for _, vol := range pod.Spec.Volumes {
 			if vol.Secret != nil && vol.Secret.SecretName == secret.Name {
 				a.Violated = false

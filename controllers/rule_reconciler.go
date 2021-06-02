@@ -2,18 +2,18 @@ package controllers
 
 import (
 	"context"
-	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/kouzoh/merlin/notifiers"
-	"github.com/kouzoh/merlin/rules"
 	"github.com/prometheus/client_golang/prometheus"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	"github.com/kouzoh/merlin/rules"
 )
 
 const FinalizerName = "rule.finalizers.merlin.mercari.com"
@@ -22,11 +22,11 @@ type RuleReconciler struct {
 	client.Client
 	log    logr.Logger
 	scheme *runtime.Scheme
-	// notifierCache stores the notifiers as cache, this will be updated when any notifier updates happen,
+	// notifiers stores the notifiers as cache, this will be updated when any notifiers updates happen,
 	// and also servers as cache so we dont need to get list of notifiers every time
-	notifierCache *notifiers.Cache
+	notifiers *notifiersCache
 	// rules is the rules cache that this reconcilers will setup and evaluate.
-	rules *rules.Cache
+	rules *rulesCache
 	// ruleFactory generates new rule when there's any rule change/update/delete events.
 	ruleFactory rules.RuleFactory
 	// violationMetrics
@@ -35,14 +35,13 @@ type RuleReconciler struct {
 
 func (r *RuleReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	l := r.log.WithName("Reconcile").WithValues("rule", req.NamespacedName)
-	if !r.notifierCache.IsReady {
-		l.V(1).Info("Notifier is not ready")
-		return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
+	l := r.log.WithName("RuleReconciler").WithValues("rule", req.NamespacedName)
+	if !r.notifiers.isReady {
+		l.V(1).Info("Notifiers are not ready, requeue the request")
+		return ctrl.Result{RequeueAfter: requeueMinInternalSeconds * time.Second}, nil
 	}
 
 	l.Info("Reconciling for rule changed/created")
-
 	rule, err := r.ruleFactory.New(ctx, r.Client, l, req.NamespacedName)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
@@ -67,23 +66,16 @@ func (r *RuleReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			}
 		}
 	} else if containsString(rule.GetObjectMeta().Finalizers, FinalizerName) {
-		l.Info("Rule is being delete, clear alerts")
-		for _, n := range rule.GetNotification().Notifiers { // TODO: simplify this?
-			notifier, ok := r.notifierCache.Notifiers[n]
-			if !ok {
-				l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
-				continue
-			}
-			l.V(1).Info("removing alert from notifier", "notifier", notifier.Resource.Name, "ruleName", rule.GetName())
-			notifier.ClearRuleAlerts(rule.GetName(), "recover alert since rule is being deleted")
-			r.rules.Delete(req.Namespace, req.Name)
-			rule.RemoveFinalizer(FinalizerName)
-			if err := r.Update(ctx, ruleObject); err != nil {
-				l.Error(err, "Failed to remove finalizer")
-				return ctrl.Result{}, err
-			}
-			return ctrl.Result{}, nil
+		msg := "recover alert since rule is being deleted"
+		l.Info(msg)
+		r.notifiers.ClearRuleAlerts(rule.GetNotification().Notifiers, rule.GetName(), msg)
+		r.rules.Delete(req.Namespace, req.Name)
+		rule.RemoveFinalizer(FinalizerName)
+		if err := r.Update(ctx, ruleObject); err != nil {
+			l.Error(err, "Failed to remove finalizer")
+			return ctrl.Result{}, err
 		}
+		return ctrl.Result{}, nil
 	}
 
 	alerts, err := rule.EvaluateAll(ctx)
@@ -92,32 +84,10 @@ func (r *RuleReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{RequeueAfter: requeueIntervalForError()}, err
 	}
 
-	for _, n := range rule.GetNotification().Notifiers { // TODO: simplify this?
-		notifier, ok := r.notifierCache.Notifiers[n]
-		if !ok {
-			l.Error(NotifierNotFoundErr, "notifier not found", "notifier", n)
-			continue
-		}
-		for _, a := range alerts {
-			l.V(1).Info("Setting alerts to notifier", "alert", a)
-			notifier.SetAlert(rule.GetName(), a)
-			resource := strings.Split(a.ResourceName, "/")
-			ruleName := strings.Split(rule.GetName(), "/")
-			promLabels := prometheus.Labels{
-				"rule":               ruleName[0],
-				"rule_name":          ruleName[1],
-				"resource_namespace": resource[0],
-				"resource_name":      resource[1],
-				"kind":               a.ResourceKind,
-			}
-			if a.Violated {
-				r.violationMetrics.With(promLabels).Set(1)
-			} else {
-				r.violationMetrics.With(promLabels).Set(0)
-			}
-		}
+	for _, a := range alerts {
+		l.V(1).Info("Setting alerts to notifiers", "alert", a)
+		r.notifiers.SetAlert(rule, a)
 	}
-
 	rule.SetReady(true)
 	return ctrl.Result{}, nil
 }
@@ -149,4 +119,44 @@ func (r *RuleReconciler) SetupWithManager(mgr ctrl.Manager, violationMetrics *pr
 	return builder.
 		WithEventFilter(&EventFilter{Log: l}).
 		Complete(r)
+}
+
+type rulesCache struct {
+	sync.Mutex
+	rules map[string]map[string]rules.Rule
+}
+
+func (c *rulesCache) Load(namespace, name string) rules.Rule {
+	c.Lock()
+	r := c.rules[namespace][name]
+	c.Unlock()
+	return r
+}
+
+func (c *rulesCache) LoadNamespaced(namespace string) (map[string]rules.Rule, bool) {
+	c.Lock()
+	rs, ok := c.rules[namespace]
+	c.Unlock()
+	return rs, ok
+}
+
+func (c *rulesCache) Save(namespace, name string, rule rules.Rule) {
+	c.Lock()
+	if c.rules == nil {
+		c.rules = map[string]map[string]rules.Rule{}
+	}
+	if _, ok := c.rules[namespace]; !ok {
+		c.rules[namespace] = map[string]rules.Rule{}
+	}
+	c.rules[namespace][name] = rule
+	c.Unlock()
+}
+
+func (c *rulesCache) Delete(namespace, name string) {
+	c.Lock()
+	if c.rules == nil {
+		c.rules = map[string]map[string]rules.Rule{}
+	}
+	delete(c.rules[namespace], name)
+	c.Unlock()
 }
