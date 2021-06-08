@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= gcr.io/mercari-us-double/merlin:latest
+IMG ?= mercari/merlin:latest
 CRD_OPTIONS ?= "crd:crdVersions=v1"
 
 GOFILES := $(shell find . -name "*.go" -type f -not -path "./vendor/*")

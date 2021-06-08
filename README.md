@@ -6,6 +6,7 @@ An agent that sends out alerts when kubernetes resources are misconfigured or ha
 
 Please see [Docs](https://github.com/kouzoh/merlin/tree/master/docs) for detailed documentations
 
+
 ## Installation
 
 ### Install CRDs
@@ -16,14 +17,11 @@ make install
 ```  
 to install the CRDs
 
-
-
 ### Uninstall CRDs
 To uninstall CRDs, you can run:
 ```bash
 make uninstall
 ```
-
 
 ### Sample custom resources
 Once CRDs are installed, you can start setting what rules you'd like to have, there are several samples under `config/samples`, 
@@ -33,7 +31,6 @@ make apply-samples
 ```
 to apply all sample resources
 
-
 ### Install controller manager
 After you've applied the custom resources, run
 ```bash
@@ -41,7 +38,8 @@ make deploy
 ``` 
 to install the controller.
 
-Note this will create a namespace called `merlin-us-dev` and install the controller manager in it.
+Note this will create a namespace called `merlin` and install the controller manager in it.
+
 
 ## Testing
 You can run the tests with 
@@ -76,6 +74,6 @@ https://www.mercari.com/cla/
 
 ## License
 
-Copyright 2020 Mercari, Inc.
+Copyright 2021 Mercari, Inc.
 
 Licensed under the Apache 2.0 License.
