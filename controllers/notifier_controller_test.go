@@ -16,10 +16,10 @@ import (
 
 	// +kubebuilder:scaffold:imports
 
-	"github.com/kouzoh/merlin/alert"
-	"github.com/kouzoh/merlin/alert/slack"
-	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
-	"github.com/kouzoh/merlin/notifiers"
+	"github.com/mercari/merlin/alert"
+	"github.com/mercari/merlin/alert/slack"
+	merlinv1beta1 "github.com/mercari/merlin/api/v1beta1"
+	"github.com/mercari/merlin/notifiers"
 )
 
 var _ = Describe("NotifierControllerTests", func() {

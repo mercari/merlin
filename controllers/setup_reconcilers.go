@@ -14,8 +14,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
-	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
-	"github.com/kouzoh/merlin/rules"
+	merlinv1beta1 "github.com/mercari/merlin/api/v1beta1"
+	"github.com/mercari/merlin/rules"
 )
 
 var notifierReconciler *NotifierReconciler

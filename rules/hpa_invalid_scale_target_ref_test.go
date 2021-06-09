@@ -15,9 +15,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kouzoh/merlin/alert"
-	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
-	"github.com/kouzoh/merlin/mocks"
+	"github.com/mercari/merlin/alert"
+	merlinv1beta1 "github.com/mercari/merlin/api/v1beta1"
+	"github.com/mercari/merlin/mocks"
 )
 
 func Test_HPAInvalidScaleTargetRefRuleBasic(t *testing.T) {

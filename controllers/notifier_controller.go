@@ -14,10 +14,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	"github.com/kouzoh/merlin/alert"
-	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
-	"github.com/kouzoh/merlin/notifiers"
-	"github.com/kouzoh/merlin/rules"
+	"github.com/mercari/merlin/alert"
+	merlinv1beta1 "github.com/mercari/merlin/api/v1beta1"
+	"github.com/mercari/merlin/notifiers"
+	"github.com/mercari/merlin/rules"
 )
 
 type notifiersCache struct {
