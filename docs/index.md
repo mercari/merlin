@@ -79,7 +79,7 @@ any issues with the resources. Each Notifier has the following properties in its
 Example Spec:
 
 ```yaml
-apiVersion: merlin.mercari.com/v1
+apiVersion: merlin.mercari.com/v1beta1
 kind: Notifier
 metadata:
   name: slack-notification
@@ -130,7 +130,7 @@ other properties depend on different rules.):
 
 For example, the following is the rule for `ClusterRuleHPAReplicaPercentage`: 
 ```yaml
-apiVersion: merlin.mercari.com/v1
+apiVersion: merlin.mercari.com/v1beta1
 kind: ClusterRuleHPAReplicaPercentage
 metadata:
   annotations:
@@ -171,7 +171,7 @@ on the rules):
 
 The following in an example of rule `RuleHPAReplicaPercentage`:
 ```yaml
-apiVersion: merlin.mercari.com/v1
+apiVersion: merlin.mercari.com/v1beta1
 kind: RuleHPAReplicaPercentage
 metadata:
   namespace: default
