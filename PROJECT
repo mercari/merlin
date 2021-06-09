@@ -1,5 +1,5 @@
 domain: mercari.com
-repo: github.com/kouzoh/merlin
+repo: github.com/mercari/merlin
 resources:
 - group: merlin
   kind: RuleHPAReplicaPercentage

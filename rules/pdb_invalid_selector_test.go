@@ -15,9 +15,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kouzoh/merlin/alert"
-	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
-	"github.com/kouzoh/merlin/mocks"
+	"github.com/mercari/merlin/alert"
+	merlinv1beta1 "github.com/mercari/merlin/api/v1beta1"
+	"github.com/mercari/merlin/mocks"
 )
 
 func Test_PDBInvalidSelectorRule_Basic(t *testing.T) {

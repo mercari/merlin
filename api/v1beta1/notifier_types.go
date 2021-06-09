@@ -19,8 +19,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/kouzoh/merlin/alert"
-	"github.com/kouzoh/merlin/alert/slack"
+	"github.com/mercari/merlin/alert"
+	"github.com/mercari/merlin/alert/slack"
 )
 
 const (

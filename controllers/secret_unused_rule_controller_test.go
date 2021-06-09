@@ -15,9 +15,9 @@ import (
 
 	// +kubebuilder:scaffold:imports
 
-	"github.com/kouzoh/merlin/alert"
-	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
-	"github.com/kouzoh/merlin/notifiers"
+	"github.com/mercari/merlin/alert"
+	merlinv1beta1 "github.com/mercari/merlin/api/v1beta1"
+	"github.com/mercari/merlin/notifiers"
 )
 
 var _ = Describe("SecretUnusedRuleControllerTests", func() {

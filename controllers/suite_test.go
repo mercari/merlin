@@ -19,7 +19,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
+	merlinv1beta1 "github.com/mercari/merlin/api/v1beta1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/scheme"
