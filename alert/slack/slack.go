@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/kouzoh/merlin/alert"
+	"github.com/mercari/merlin/alert"
 )
 
 type BlockType string

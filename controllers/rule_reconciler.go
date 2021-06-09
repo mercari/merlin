@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/kouzoh/merlin/rules"
+	"github.com/mercari/merlin/rules"
 )
 
 const FinalizerName = "rule.finalizers.merlin.mercari.com"

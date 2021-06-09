@@ -1,7 +1,7 @@
 package v1beta1
 
 import (
-	"github.com/kouzoh/merlin/alert"
+	"github.com/mercari/merlin/alert"
 )
 
 // RequiredLabel is the

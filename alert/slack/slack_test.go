@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kouzoh/merlin/alert"
+	"github.com/mercari/merlin/alert"
 	"github.com/stretchr/testify/assert"
 )
 

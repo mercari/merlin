@@ -10,9 +10,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/kouzoh/merlin/alert"
-	"github.com/kouzoh/merlin/alert/slack"
-	merlinv1beta1 "github.com/kouzoh/merlin/api/v1beta1"
+	"github.com/mercari/merlin/alert"
+	"github.com/mercari/merlin/alert/slack"
+	merlinv1beta1 "github.com/mercari/merlin/api/v1beta1"
 )
 
 func Test_Notifier(t *testing.T) {

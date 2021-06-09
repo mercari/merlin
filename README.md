@@ -4,7 +4,7 @@ An agent that sends out alerts when kubernetes resources are misconfigured or ha
 
 ## Technical background and designs
 
-Please see [Docs](https://github.com/kouzoh/merlin/tree/master/docs) for detailed documentations
+Please see [Docs](https://github.com/mercari/merlin/tree/master/docs) for detailed documentations
 
 
 ## Installation

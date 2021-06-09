@@ -1,4 +1,4 @@
-module github.com/kouzoh/merlin
+module github.com/mercari/merlin
 
 go 1.16
 

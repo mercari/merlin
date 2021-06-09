@@ -20,7 +20,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	"github.com/kouzoh/merlin/alert"
+	"github.com/mercari/merlin/alert"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
